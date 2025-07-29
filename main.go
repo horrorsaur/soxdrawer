@@ -8,13 +8,13 @@ import (
 	"syscall"
 	"time"
 
-	"soxdrawer/internal/httpserver"
-	"soxdrawer/internal/server"
+	"soxdrawer/internal/http"
+	"soxdrawer/internal/nats"
 	"soxdrawer/internal/store"
 )
 
 func main() {
-	natsServer, err := server.New(server.DefaultConfig())
+	natsServer, err := nats.NewServer(nats.DefaultConfig())
 	if err != nil {
 		log.Fatalf("Failed to create NATS server: %v", err)
 	}
@@ -33,8 +33,8 @@ func main() {
 	log.Printf("Object store status - Bucket: %s, Size: %d", status.Bucket(), status.Size())
 
 	// Start HTTP server
-	httpConfig := httpserver.DefaultConfig()
-	httpServer := httpserver.New(httpConfig, objectStore)
+	httpConfig := http.DefaultConfig()
+	httpServer := http.New(httpConfig, objectStore)
 	if err := httpServer.Start(); err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
@@ -43,15 +43,12 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Println("SoxDrawer is running with HTTP server. Press Ctrl+C to stop.")
-
-	// Wait for shutdown signal
+	log.Println("soxdrawer is running. Press Ctrl+C to stop.")
 	<-sigChan
-
 	shutdown(natsServer, httpServer)
 }
 
-func shutdown(natsServer *server.NATSServer, httpServer *httpserver.Server) {
+func shutdown(natsServer *nats.NATSServer, httpServer *http.Server) {
 	log.Println("Shutting down SoxDrawer...")
 
 	// Gracefully shutdown

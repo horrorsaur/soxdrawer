@@ -7,20 +7,16 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-// ObjectStore wraps NATS ObjectStore functionality
 type ObjectStore struct {
 	bucket nats.ObjectStore
 	js     nats.JetStreamContext
 }
 
-// New creates a new ObjectStore instance with the "default" bucket
 func New(js nats.JetStreamContext) (*ObjectStore, error) {
-	// Create or get the "default" object store bucket
 	bucket, err := js.CreateObjectStore(&nats.ObjectStoreConfig{
 		Bucket: "default",
 	})
 	if err != nil {
-		// If bucket already exists, try to get it
 		bucket, err = js.ObjectStore("default")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create or get object store bucket 'default': %w", err)
@@ -95,11 +91,11 @@ func (os *ObjectStore) Delete(key string) error {
 // ListKeys returns a list of all object keys in the bucket
 func (os *ObjectStore) ListKeys() ([]string, error) {
 	var keys []string
-	
+
 	// We'll use the Watch functionality to get object names
 	// For now, let's implement a simpler approach by trying to get info for known keys
 	// This is a limitation - NATS object store List() API seems to have changed
-	
+
 	return keys, nil
 }
 

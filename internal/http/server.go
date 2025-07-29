@@ -1,4 +1,4 @@
-package httpserver
+package http
 
 import (
 	"context"
@@ -9,19 +9,18 @@ import (
 	"soxdrawer/internal/store"
 )
 
-// Server holds the HTTP server and its dependencies
-type Server struct {
-	Address     string
-	ObjectStore *store.ObjectStore
-	server      *http.Server
-}
+type (
+	Server struct {
+		Address     string
+		ObjectStore *store.ObjectStore
+		server      *http.Server
+	}
 
-// Config holds configuration for the HTTP server
-type Config struct {
-	Address string
-}
+	Config struct {
+		Address string
+	}
+)
 
-// DefaultConfig returns a default HTTP server configuration
 func DefaultConfig() *Config {
 	return &Config{
 		Address: ":8080",
@@ -48,8 +47,7 @@ func (s *Server) Start() error {
 	}
 
 	log.Printf("Starting HTTP server on %s", s.Address)
-	
-	// Start server in a goroutine so it doesn't block
+
 	go func() {
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start HTTP server: %v", err)
@@ -123,7 +121,7 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// and store it in the NATS object store
 
 	log.Printf("Upload request received from %s", r.RemoteAddr)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"status": "stub", "message": "Upload endpoint not yet implemented"}`)
 }

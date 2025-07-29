@@ -1,4 +1,4 @@
-package server
+package nats
 
 import (
 	"context"
@@ -10,22 +10,21 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-// NATSServer wraps the embedded NATS server and provides management functions
-type NATSServer struct {
-	server *server.Server
-	conn   *nats.Conn
-	js     nats.JetStreamContext
-	opts   *server.Options
-}
+type (
+	NATSServer struct {
+		server *server.Server
+		conn   *nats.Conn
+		js     nats.JetStreamContext
+		opts   *server.Options
+	}
 
-// Config holds configuration for the NATS server
-type Config struct {
-	Host     string
-	Port     int
-	StoreDir string
-}
+	Config struct {
+		Host     string
+		Port     int
+		StoreDir string
+	}
+)
 
-// DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
 		Host:     "127.0.0.1",
@@ -34,8 +33,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// New creates a new NATS server instance
-func New(config *Config) (*NATSServer, error) {
+func NewServer(config *Config) (*NATSServer, error) {
 	opts := &server.Options{
 		Host:      config.Host,
 		Port:      config.Port,
@@ -56,17 +54,14 @@ func New(config *Config) (*NATSServer, error) {
 
 // Start starts the NATS server and establishes connections
 func (ns *NATSServer) Start() error {
-	// Start the server in a goroutine
 	go ns.server.Start()
 
-	// Wait for the server to be ready
 	if !ns.server.ReadyForConnections(10 * time.Second) {
 		return fmt.Errorf("NATS server failed to start within timeout")
 	}
 
 	log.Printf("NATS server started on %s:%d with JetStream enabled", ns.opts.Host, ns.opts.Port)
 
-	// Connect to the embedded NATS server
 	url := fmt.Sprintf("nats://%s:%d", ns.opts.Host, ns.opts.Port)
 	conn, err := nats.Connect(url)
 	if err != nil {
