@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/nats-io/nats.go"
 )
@@ -90,11 +91,15 @@ func (os *ObjectStore) Delete(key string) error {
 
 // ListKeys returns a list of all object keys in the bucket
 func (os *ObjectStore) ListKeys() ([]string, error) {
-	var keys []string
+	objectInfo, err := os.bucket.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list objects: %w", err)
+	}
 
-	// We'll use the Watch functionality to get object names
-	// For now, let's implement a simpler approach by trying to get info for known keys
-	// This is a limitation - NATS object store List() API seems to have changed
+	keys := make([]string, len(objectInfo))
+	for i, info := range objectInfo {
+		keys[i] = info.Name
+	}
 
 	return keys, nil
 }
@@ -123,4 +128,39 @@ func (os *ObjectStore) Status() (nats.ObjectStoreStatus, error) {
 // Bucket returns the underlying NATS ObjectStore bucket
 func (os *ObjectStore) Bucket() nats.ObjectStore {
 	return os.bucket
+}
+
+// ListObjects returns a list of all objects with their metadata
+func (os *ObjectStore) ListObjects() ([]*nats.ObjectInfo, error) {
+	objectInfo, err := os.bucket.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list objects: %w", err)
+	}
+	return objectInfo, nil
+}
+
+// ObjectInfo represents simplified object metadata for JSON responses
+type ObjectInfo struct {
+    Name    string    `json:"name"`
+    Size    uint64    `json:"size"`
+    Created time.Time `json:"created"`
+}
+
+// ListObjectsForAPI returns a list of objects with simplified metadata
+func (os *ObjectStore) ListObjectsForAPI() ([]*ObjectInfo, error) {
+	natsObjects, err := os.bucket.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list objects: %w", err)
+	}
+
+    objects := make([]*ObjectInfo, len(natsObjects))
+    for i, obj := range natsObjects {
+        objects[i] = &ObjectInfo{
+            Name:    obj.Name,
+            Size:    obj.Size,
+            Created: obj.ModTime,
+        }
+    }
+
+	return objects, nil
 }
