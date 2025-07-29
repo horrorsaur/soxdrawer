@@ -1,0 +1,12 @@
+{
+  "name": "soxdrawer-firefox-extension",
+  "version": "1.0.0",
+  "description": "Firefox extension for SoxDrawer object storage service",
+  "scripts": {
+    "validate": "node validate_extension.js",
+    "package": "zip -r soxdrawer-extension.zip . -x '*.zip' 'node_modules/*' 'package-lock.json' 'validate_extension.js'"
+  },
+  "keywords": ["firefox", "extension", "storage", "nats"],
+  "author": "SoxDrawer Team",
+  "license": "MIT"
+}
