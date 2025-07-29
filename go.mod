@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/a-h/templ v0.3.924 // indirect
 	github.com/google/go-tpm v0.9.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect

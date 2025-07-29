@@ -1,0 +1,70 @@
+package templates
+
+import "soxdrawer/internal/store"
+import "fmt"
+
+templ ListPage(objects []*store.ObjectInfo) {
+	<div class="card">
+		<h1>Stored Objects</h1>
+		if len(objects) == 0 {
+			<p>No objects found.</p>
+		} else {
+			<div style="overflow-x: auto;">
+				<table style="width: 100%; border-collapse: collapse;">
+					<thead>
+						<tr style="background-color: #f8f9fa;">
+							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Name</th>
+							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Size</th>
+							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Modified</th>
+							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, obj := range objects {
+							<tr style="border-bottom: 1px solid #dee2e6;">
+								<td style="padding: 12px;">{ obj.Name }</td>
+								<td style="padding: 12px;">{ fmt.Sprintf("%d bytes", obj.Size) }</td>
+								<td style="padding: 12px;">{ obj.Created.Format("2006-01-02 15:04:05") }</td>
+								<td style="padding: 12px;">
+									<a
+										href={ templ.URL("/download/" + obj.Name) }
+										class="button button-secondary"
+										style="margin-right: 8px;"
+									>Download</a>
+									<button
+										class="button"
+										style="background-color: #dc3545;"
+										onclick={ templ.ComponentScript{Call: "deleteObject('" + obj.Name + "')"} }
+									>Delete</button>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		<div style="margin-top: 20px;">
+			<a href="/" class="button">Upload More Files</a>
+		</div>
+	</div>
+	<script>
+    function deleteObject(name) {
+        if (confirm('Are you sure you want to delete "' + name + '"?')) {
+            fetch('/delete/' + encodeURIComponent(name), {
+                method: 'DELETE'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+        }
+    }
+</script>
+}

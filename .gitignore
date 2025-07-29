@@ -32,3 +32,5 @@ go.work.sum
 # .vscode/
 
 jetstream/
+# Generated templ files
+*_templ.go
