@@ -82,7 +82,6 @@ class ExtensionNATSClient {
       timeout: this.config.timeout,
       ...options,
       headers: {
-        "Content-Type": "application/json",
         ...options.headers,
       },
     };
@@ -139,7 +138,7 @@ class HTTPObjectStore {
       const response = await this.client.makeRequest("/upload", {
         method: "POST",
         body: formData,
-        headers: {}, // Don't set Content-Type, let browser set it for FormData
+        headers: {},
       });
 
       if (!response.ok) {
@@ -250,7 +249,7 @@ class HTTPObjectStore {
 
   async list() {
     try {
-      const response = await this.client.makeRequest("/list", {
+      const response = await this.client.makeRequest("/list?json=true", {
         method: "GET",
       });
 

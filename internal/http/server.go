@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +108,20 @@ func (s *Server) listHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Failed to list objects: %v", err)
 		s.sendErrorResponse(w, "Failed to list objects", http.StatusInternalServerError)
+		return
+	}
+
+	jsonParam, _ := strconv.ParseBool(r.URL.Query().Get("json"))
+	if jsonParam {
+		response := ListResponse{
+			Status:  "success",
+			Message: "",
+			Objects: objects,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
