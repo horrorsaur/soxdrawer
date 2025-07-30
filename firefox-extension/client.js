@@ -206,7 +206,7 @@ class HTTPObjectStore {
         };
       }
     } catch (error) {
-      console.error("❌ Failed to get status:", error);
+      console.error("Failed to get status:", error);
       throw error;
     }
   }
