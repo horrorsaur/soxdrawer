@@ -150,49 +150,6 @@ class HTTPObjectStore {
     }
   }
 
-  async getString(key) {
-    const result = await this.get(key);
-    return new TextDecoder().decode(result.data);
-  }
-
-  async getInfo(key) {
-    // Since we don't have a separate info endpoint, we'll try to get the object
-    // This is not optimal but works for the current Go server implementation
-    try {
-      const result = await this.get(key);
-      return result.info;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async delete(key) {
-    try {
-      const response = await this.client.makeRequest(
-        `/delete/${encodeURIComponent(key)}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Object '${key}' not found`);
-        }
-        throw new Error(
-          `Delete failed: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const result = await response.json();
-      console.log(`✅ Deleted object '${key}'`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed to delete object '${key}':`, error);
-      throw error;
-    }
-  }
-
   async list() {
     try {
       const response = await this.client.makeRequest("/list?json=true", {
@@ -212,7 +169,7 @@ class HTTPObjectStore {
       }
 
       const objects = result.objects || [];
-      console.log(`✅ Listed ${objects.length} objects`);
+      console.log(`Listed ${objects.length} objects`);
 
       // Convert the Go server's object format to our expected format
       return objects.map((obj) => ({
@@ -222,19 +179,7 @@ class HTTPObjectStore {
         // Add other fields as available from the Go server
       }));
     } catch (error) {
-      console.error("❌ Failed to list objects:", error);
-      throw error;
-    }
-  }
-
-  async exists(key) {
-    try {
-      await this.getInfo(key);
-      return true;
-    } catch (error) {
-      if (error.message.includes("not found")) {
-        return false;
-      }
+      console.error("Failed to list objects:", error);
       throw error;
     }
   }
