@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -41,7 +42,8 @@
             cursor: pointer;
         }
 
-        .nav a:hover, .nav a.active {
+        .nav a:hover,
+        .nav a.active {
             background-color: rgba(255, 255, 255, 0.1);
         }
 
@@ -178,7 +180,8 @@
             margin-top: 15px;
         }
 
-        th, td {
+        th,
+        td {
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #dee2e6;
@@ -229,6 +232,7 @@
         }
     </style>
 </head>
+
 <body>
     <header class="header">
         <h1>SoxDrawer</h1>
@@ -249,10 +253,11 @@
                 </div>
 
                 <h1>Welcome to SoxDrawer</h1>
-                <p>A NATS-powered object storage service that allows you to upload, store, and retrieve files efficiently.</p>
+                <p>A NATS-powered object storage service that allows you to upload, store, and retrieve files
+                    efficiently.</p>
 
                 <h2>Upload a File</h2>
-                
+
                 <!-- Drop Zone -->
                 <div id="dropZone" class="drop-zone">
                     <p>Drag & Drop files, text, or images here</p>
@@ -277,7 +282,7 @@
             <div class="card">
                 <h1>Stored Objects</h1>
                 <button class="button" id="refreshListBtn" disabled>Refresh List</button>
-                
+
                 <div id="objectsContainer">
                     <div class="loading">Click "Refresh List" to view stored files</div>
                 </div>
@@ -293,6 +298,7 @@
         <p>SoxDrawer - A NATS-powered object storage service</p>
     </footer>
 
-    <script src="popup.js"></script>
+    <script src="sidebar.js"></script>
 </body>
+
 </html>

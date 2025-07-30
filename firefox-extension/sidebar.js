@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("SoxDrawer popup loaded");
+  console.log("SoxDrawer loaded");
 
   // DOM elements
   const serverIndicator = document.getElementById("serverIndicator");
