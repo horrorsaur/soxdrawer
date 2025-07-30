@@ -39,6 +39,10 @@ func NewServer(config *Config) (*NATSServer, error) {
 		Port:      config.Port,
 		JetStream: true,
 		StoreDir:  config.StoreDir,
+		Websocket: server.WebsocketOpts{
+			Port:  8080,
+			NoTLS: true,
+		},
 	}
 
 	ns, err := server.NewServer(opts)
