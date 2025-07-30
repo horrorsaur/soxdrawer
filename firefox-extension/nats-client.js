@@ -1,59 +1,56 @@
-// NATS Client for Firefox Extension
-// Simplified version that works within extension limitations
+// NATS Client for Firefox Extension - HTTP REST API version
+// Connects to the Go SoxDrawer server via HTTP REST endpoints
 
 class ExtensionNATSClient {
   constructor(config = {}) {
     this.config = {
-      servers: config.servers || ['ws://localhost:8080'],
-      reconnect: config.reconnect !== false,
-      maxReconnectAttempts: config.maxReconnectAttempts || 10,
-      reconnectTimeWait: config.reconnectTimeWait || 2000,
+      serverUrl: config.serverUrl || 'http://localhost:8080',
+      timeout: config.timeout || 10000,
+      retryAttempts: config.retryAttempts || 3,
+      retryDelay: config.retryDelay || 1000,
       ...config
     };
     
-    this.ws = null;
     this.connected = false;
-    this.reconnectAttempts = 0;
-    this.subscriptions = new Map();
-    this.requestId = 0;
-    this.pendingRequests = new Map();
+    this.connectionError = null;
     this.objectStore = null;
     
     console.log('🔧 ExtensionNATSClient initialized with config:', this.config);
   }
 
   async connect() {
-    return new Promise((resolve, reject) => {
-      try {
-        console.log('🚀 Attempting to connect to NATS...');
-        
-        // For now, we'll simulate a connection since we can't directly connect to NATS from extension
-        // In a real implementation, we'd need a WebSocket proxy or use the extension's native messaging
-        setTimeout(() => {
-          this.connected = true;
-          this.reconnectAttempts = 0;
-          console.log('✅ Simulated NATS connection established');
-          
-          // Initialize mock object store
-          this.objectStore = new MockObjectStore();
-          
-          resolve(this);
-        }, 100);
-        
-      } catch (error) {
-        console.error('❌ Failed to connect to NATS:', error);
-        reject(error);
+    console.log('🚀 Attempting to connect to SoxDrawer server...');
+    
+    try {
+      // Test connection by hitting the root endpoint
+      const response = await this.makeRequest('/', {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/html,application/json'
+        }
+      });
+
+      if (response.ok) {
+        this.connected = true;
+        this.connectionError = null;
+        this.objectStore = new HTTPObjectStore(this);
+        console.log('✅ Connected to SoxDrawer server');
+        return this;
+      } else {
+        throw new Error(`Server responded with status: ${response.status}`);
       }
-    });
+    } catch (error) {
+      this.connected = false;
+      this.connectionError = error.message;
+      console.error('❌ Failed to connect to SoxDrawer server:', error);
+      throw error;
+    }
   }
 
   async disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
     this.connected = false;
-    console.log('🛑 NATS connection closed');
+    this.objectStore = null;
+    console.log('🛑 Disconnected from SoxDrawer server');
   }
 
   isConnected() {
@@ -62,7 +59,7 @@ class ExtensionNATSClient {
 
   async getObjectStore(bucketName = 'default') {
     if (!this.connected) {
-      throw new Error('Not connected to NATS');
+      throw new Error('Not connected to SoxDrawer server');
     }
     
     console.log(`📦 Getting object store: ${bucketName}`);
@@ -72,117 +69,245 @@ class ExtensionNATSClient {
   getConnectionInfo() {
     return {
       connected: this.connected,
-      server: this.config.servers[0],
-      reconnectAttempts: this.reconnectAttempts,
+      server: this.config.serverUrl,
+      error: this.connectionError,
+      timestamp: new Date().toISOString(),
     };
+  }
+
+  // Helper method to make HTTP requests with proper error handling
+  async makeRequest(endpoint, options = {}) {
+    const url = `${this.config.serverUrl}${endpoint}`;
+    const requestOptions = {
+      timeout: this.config.timeout,
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    };
+
+    console.log(`🌐 Making request to: ${url}`, requestOptions.method || 'GET');
+
+    try {
+      const response = await fetch(url, requestOptions);
+      return response;
+    } catch (error) {
+      console.error(`❌ Request failed to ${url}:`, error);
+      throw error;
+    }
   }
 }
 
-// Mock Object Store for testing within extension
-class MockObjectStore {
-  constructor() {
-    this.objects = new Map();
-    console.log('🗃️ Mock ObjectStore initialized');
+// HTTP-based Object Store that communicates with Go server
+class HTTPObjectStore {
+  constructor(client) {
+    this.client = client;
+    console.log('🗃️ HTTPObjectStore initialized');
   }
 
   async put(key, data, metadata = {}) {
-    const objectInfo = {
-      name: key,
-      size: data.length || data.byteLength || 0,
-      created: new Date().toISOString(),
-      digest: this.generateDigest(key),
-      chunks: 1,
-      metadata: metadata
-    };
-    
-    this.objects.set(key, {
-      data: data,
-      info: objectInfo
-    });
-    
-    console.log(`✅ Mock stored object '${key}' (${objectInfo.size} bytes)`);
-    return objectInfo;
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Convert data to File/Blob if it's not already
+      let fileData;
+      if (data instanceof File) {
+        fileData = data;
+      } else if (data instanceof Blob) {
+        fileData = data;
+      } else if (typeof data === 'string') {
+        fileData = new Blob([data], { type: 'text/plain' });
+      } else if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
+        fileData = new Blob([data], { type: 'application/octet-stream' });
+      } else {
+        // Convert other data types to JSON string
+        fileData = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      }
+
+      // Create a File object with the specified name
+      const file = new File([fileData], key, { 
+        type: fileData.type,
+        lastModified: Date.now()
+      });
+
+      formData.append('file', file);
+
+      const response = await this.client.makeRequest('/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {} // Don't set Content-Type, let browser set it for FormData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Stored object '${key}' (${result.size} bytes)`);
+      
+      return {
+        name: result.key,
+        size: result.size,
+        created: result.created || new Date().toISOString(),
+        filename: result.filename,
+      };
+    } catch (error) {
+      console.error(`❌ Failed to store object '${key}':`, error);
+      throw error;
+    }
   }
 
   async get(key) {
-    const stored = this.objects.get(key);
-    if (!stored) {
-      throw new Error(`Object '${key}' not found`);
+    try {
+      const response = await this.client.makeRequest(`/download/${encodeURIComponent(key)}`, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`Object '${key}' not found`);
+        }
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.arrayBuffer();
+      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentLength = response.headers.get('content-length');
+
+      console.log(`✅ Retrieved object '${key}' (${data.byteLength} bytes)`);
+      
+      return {
+        data: new Uint8Array(data),
+        info: {
+          name: key,
+          size: data.byteLength,
+          contentType: contentType,
+          contentLength: contentLength ? parseInt(contentLength) : data.byteLength,
+        }
+      };
+    } catch (error) {
+      console.error(`❌ Failed to get object '${key}':`, error);
+      throw error;
     }
-    
-    console.log(`✅ Mock retrieved object '${key}'`);
-    return {
-      data: stored.data,
-      info: stored.info
-    };
   }
 
   async getString(key) {
     const result = await this.get(key);
-    return typeof result.data === 'string' ? result.data : new TextDecoder().decode(result.data);
+    return new TextDecoder().decode(result.data);
   }
 
   async getInfo(key) {
-    const stored = this.objects.get(key);
-    if (!stored) {
-      throw new Error(`Object '${key}' not found`);
+    // Since we don't have a separate info endpoint, we'll try to get the object
+    // This is not optimal but works for the current Go server implementation
+    try {
+      const result = await this.get(key);
+      return result.info;
+    } catch (error) {
+      throw error;
     }
-    
-    return stored.info;
   }
 
   async delete(key) {
-    const existed = this.objects.delete(key);
-    if (!existed) {
-      throw new Error(`Object '${key}' not found`);
+    try {
+      const response = await this.client.makeRequest(`/delete/${encodeURIComponent(key)}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`Object '${key}' not found`);
+        }
+        throw new Error(`Delete failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Deleted object '${key}'`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to delete object '${key}':`, error);
+      throw error;
     }
-    
-    console.log(`✅ Mock deleted object '${key}'`);
-    return true;
   }
 
   async list() {
-    const objects = [];
-    for (const [key, stored] of this.objects.entries()) {
-      objects.push(stored.info);
+    try {
+      const response = await this.client.makeRequest('/list', {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        throw new Error(`List failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'List operation failed');
+      }
+
+      const objects = result.objects || [];
+      console.log(`✅ Listed ${objects.length} objects`);
+      
+      // Convert the Go server's object format to our expected format
+      return objects.map(obj => ({
+        name: obj.name,
+        size: obj.size,
+        created: obj.created,
+        // Add other fields as available from the Go server
+      }));
+    } catch (error) {
+      console.error('❌ Failed to list objects:', error);
+      throw error;
     }
-    
-    console.log(`✅ Mock listed ${objects.length} objects`);
-    return objects;
   }
 
   async exists(key) {
-    return this.objects.has(key);
+    try {
+      await this.getInfo(key);
+      return true;
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async getStatus() {
-    return {
-      bucket: 'default',
-      description: 'Mock object store for Firefox extension',
-      size: this.objects.size,
-      objects: this.objects.size,
-      storage: 'memory',
-      replicas: 1,
-    };
-  }
+    try {
+      // Check if the server has a status endpoint, otherwise simulate
+      const response = await this.client.makeRequest('/status', {
+        method: 'GET'
+      });
 
-  generateDigest(key) {
-    // Simple hash for testing
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) {
-      const char = key.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
+      if (response.ok) {
+        const result = await response.json();
+        return result;
+      } else {
+        // If no status endpoint, return basic info
+        const objects = await this.list();
+        return {
+          bucket: 'default',
+          description: 'SoxDrawer object store via HTTP',
+          objects: objects.length,
+          storage: 'nats-jetstream',
+          server: this.client.config.serverUrl,
+        };
+      }
+    } catch (error) {
+      console.error('❌ Failed to get status:', error);
+      throw error;
     }
-    return Math.abs(hash).toString(16);
   }
 }
 
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ExtensionNATSClient, MockObjectStore };
+  module.exports = { ExtensionNATSClient, HTTPObjectStore };
 } else {
   // Browser environment
   window.ExtensionNATSClient = ExtensionNATSClient;
-  window.MockObjectStore = MockObjectStore;
+  window.HTTPObjectStore = HTTPObjectStore;
 }

@@ -5,67 +5,63 @@ console.log('SoxDrawer background script loaded');
 
 // Initialize the NATS client
 const natsClient = new ExtensionNATSClient();
-let serverStatus = 'disconnected';
 
 // Function to start the NATS server connection
 async function startNATS() {
   try {
-    console.log('Starting NATS connection from background...');
+    console.log('Connecting to SoxDrawer Go server...');
     await natsClient.connect();
-    serverStatus = 'connected';
-    console.log('✅ NATS client is ready in background script');
-
-    // Test by adding a file to the mock store
-    const objectStore = await natsClient.getObjectStore();
-    await objectStore.put('welcome.txt', 'Hello from the background script!', {
-      description: 'Initial file from background script'
-    });
+    console.log('✅ Connection to Go server successful');
+    
+    // Store connection status
+    browser.storage.local.set({ natsStatus: 'connected' });
     
   } catch (error) {
-    serverStatus = 'error';
-    console.error('❌ Failed to start NATS client:', error);
+    console.error('❌ Failed to connect to Go server:', error);
+    browser.storage.local.set({ natsStatus: 'error' });
   }
 }
 
-// Start NATS when the extension is installed
+// Start NATS when the extension is installed or updated
 browser.runtime.onInstalled.addListener((details) => {
-  console.log('SoxDrawer extension installed:', details.reason);
+  console.log('SoxDrawer extension installed/updated:', details.reason);
+  startNATS();
   
-  if (details.reason === 'install' || details.reason === 'update') {
-    startNATS();
-    
-    browser.notifications.create({
-      type: 'basic',
-      title: 'SoxDrawer Ready',
-      message: 'SoxDrawer NATS server is running in the background.'
-    }).catch(err => {
-      console.log('Notification not shown:', err.message);
-    });
-  }
+  browser.notifications.create({
+    type: 'basic',
+    title: 'SoxDrawer Ready',
+    message: 'Connecting to SoxDrawer server in the background.'
+  }).catch(err => {
+    console.log('Notification not shown:', err.message);
+  });
 });
 
-// Start NATS on browser startup
+// Attempt to reconnect on browser startup
 browser.runtime.onStartup.addListener(() => {
   console.log('SoxDrawer extension started with browser');
   startNATS();
 });
 
-// Handle messages from popup or content scripts
+// Handle messages from popup
 browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Background received message:', request);
   
+  // Handle get_status requests
   if (request.action === 'get_status') {
     const status = {
-      nats: natsClient.isConnected() ? 'connected' : 'disconnected',
+      connected: natsClient.isConnected(),
       connectionInfo: natsClient.getConnectionInfo()
     };
     
     sendResponse({ status: 'success', data: status });
-    
-  } else if (request.action === 'list_objects') {
+    return false; // No async work here
+  }
+  
+  // Handle object listing requests
+  if (request.action === 'list_objects') {
     if (!natsClient.isConnected()) {
-      sendResponse({ status: 'error', message: 'NATS not connected' });
-      return true;
+      sendResponse({ status: 'error', message: 'Not connected to server' });
+      return false;
     }
     
     natsClient.getObjectStore()
@@ -76,17 +72,45 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => {
         sendResponse({ status: 'error', message: error.message });
       });
-    
+      
     return true; // Keep message channel open for async response
-    
-  } else if (request.action === 'get_object') {
+  }
+  
+  // Handle object deletion requests
+  if (request.action === 'delete_object') {
     if (!natsClient.isConnected()) {
-      sendResponse({ status: 'error', message: 'NATS not connected' });
-      return true;
+      sendResponse({ status: 'error', message: 'Not connected to server' });
+      return false;
     }
     
     natsClient.getObjectStore()
-      .then(store => store.get(request.key))
+      .then(store => store.delete(request.key))
+      .then(() => {
+        sendResponse({ status: 'success', message: `Object ${request.key} deleted` });
+      })
+      .catch(error => {
+        sendResponse({ status: 'error', message: error.message });
+      });
+      
+    return true; // Keep message channel open for async response
+  }
+  
+  // Handle file upload requests
+  if (request.action === 'upload_file') {
+    if (!natsClient.isConnected()) {
+      sendResponse({ status: 'error', message: 'Not connected to server' });
+      return false;
+    }
+    
+    // Reconstruct File object from plain object
+    const fileData = new Blob([request.data.data], { type: request.data.type });
+    const file = new File([fileData], request.data.name, { 
+      type: request.data.type,
+      lastModified: request.data.lastModified
+    });
+    
+    natsClient.getObjectStore()
+      .then(store => store.put(file.name, file))
       .then(result => {
         sendResponse({ status: 'success', data: result });
       })
@@ -97,7 +121,6 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
   
-  // Return true for any other async message handlers
   return false;
 });
 

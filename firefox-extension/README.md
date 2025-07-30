@@ -1,16 +1,38 @@
-# SoxDrawer Firefox Extension with Embedded NATS Server
+# SoxDrawer Firefox Extension
 
-This Firefox extension runs a simplified, in-memory NATS server to handle object storage directly within your browser. It demonstrates how to manage a persistent background service and communicate between the popup and background script.
+A Firefox extension that connects to the SoxDrawer Go server for NATS-powered object storage.
 
-## Features
+## Prerequisites
 
-- **Embedded NATS Server**: A mock NATS server runs in the background script
-- **Object Storage**: In-memory object store for files and data
-- **Status Monitoring**: Popup shows the connection status of the NATS server
-- **Object Listing**: View a list of all objects stored in the bucket
-- **Background Service**: NATS server runs persistently in the background
+1. **SoxDrawer Go Server**: The extension requires the SoxDrawer Go server to be running
+2. **Firefox Developer Edition or Nightly**: For loading temporary extensions
 
-## Installation (Development)
+### Starting the SoxDrawer Go Server
+
+First, make sure you have a NATS server running with JetStream:
+
+```bash
+# Install NATS server if you don't have it
+# Download from https://github.com/nats-io/nats-server/releases
+
+# Start NATS with JetStream
+nats-server -js
+```
+
+Then start the SoxDrawer Go server:
+
+```bash
+# Navigate to the main project directory
+cd ../
+
+# Build and run the SoxDrawer server
+go build .
+./soxdrawer
+```
+
+The server should start on `http://localhost:8080`
+
+## Firefox Extension Installation
 
 1. **Open Firefox Developer Tools**
    - Open Firefox and navigate to `about:debugging`
@@ -23,61 +45,114 @@ This Firefox extension runs a simplified, in-memory NATS server to handle object
    - Click "Open"
 
 3. **Test the Extension**
-   - A notification should appear indicating SoxDrawer is ready
-   - Click the extension icon in the Firefox toolbar
-   - The popup should show "NATS: Connected" status
-   - Click "List Objects" to see the default `welcome.txt` file
+   - Click the SoxDrawer extension icon in the Firefox toolbar
+   - The popup should show "Server: Connected" if the Go server is running
+   - You can now upload files, list objects, and delete files
+
+## Features
+
+### ✅ **Server Connection**
+- Connects to SoxDrawer Go server via HTTP REST API
+- Real-time connection status monitoring
+- Automatic reconnection attempts
+
+### ✅ **File Upload**
+- Upload any file type through the extension popup
+- Files are sent to the Go server's `/upload` endpoint
+- Automatic filename sanitization and unique key generation
+
+### ✅ **Object Management**
+- List all objects stored in the NATS ObjectStore
+- View file details (name, size, creation date)
+- Delete objects with confirmation dialog
+
+### ✅ **User Interface**
+- Modern, responsive popup design
+- Real-time status indicators
+- Error handling and user feedback
+- Clean object listing with actions
 
 ## Architecture
 
-The extension is built with two main components:
-
-### 1. **Background Script** (`background.js`)
-- Runs persistently in the background
-- Initializes and manages the `ExtensionNATSClient`
-- Listens for messages from the popup (`get_status`, `list_objects`)
-- Handles all NATS-related operations
-- Stores data in the `MockObjectStore`
-
-### 2. **Popup Script** (`popup.js`)
-- User interface for the extension
-- Communicates with the background script via messaging
-- Displays server status and object list
-- Sends requests to the background script for actions
-
-### Communication Flow
-
 ```
-┌─────────────────┐    ┌────────────────────┐    ┌─────────────────┐
-│   Popup (UI)    │───▶│   Message Broker   │───▶│ Background (NATS) │
-│  (popup.js)     │    │   (browser.runtime)  │    │  (background.js)  │
-└─────────────────┘    └────────────────────┘    └─────────────────┘
-                                                            │
-                                                            ▼
-                                                    ┌───────────────┐
-                                                    │ In-Memory DB  │
-                                                    │ (Object Store)│
-                                                    └───────────────┘
+┌─────────────────┐    ┌─────────────────────┐    ┌──────────────────┐
+│   Firefox       │    │   HTTP REST API     │    │  SoxDrawer Go    │
+│   Extension     │◄──►│   (fetch/xhr)       │◄──►│     Server       │
+│                 │    │                     │    │                  │
+│ • Popup UI      │    │ GET  /list          │    │ • NATS Client    │
+│ • Background    │    │ POST /upload        │    │ • JetStream      │
+│ • File Mgmt     │    │ GET  /download/:key │    │ • ObjectStore    │
+│                 │    │ DELETE /delete/:key │    │ • HTTP Server    │
+└─────────────────┘    └─────────────────────┘    └──────────────────┘
 ```
 
-## Files
+## API Endpoints Used
 
-- `manifest.json`: Extension configuration, permissions, and scripts
-- `background.js`: Main background script with NATS server logic
-- `popup.html`: HTML structure for the popup
-- `popup.js`: JavaScript for the popup UI
-- `nats-client.js`: Simplified NATS client and mock object store
+The extension communicates with these Go server endpoints:
 
-## Troubleshooting
+- **`GET /`**: Server health check
+- **`POST /upload`**: Upload files (multipart/form-data)
+- **`GET /list`**: List all objects in JSON format
+- **`DELETE /delete/:key`**: Delete a specific object
+- **`GET /download/:key`**: Download an object (for future use)
 
-- **Extension not working**: Check the browser console for errors. Open `about:debugging`, find SoxDrawer, and click "Inspect".
-- **Status shows Disconnected**: The background script may have failed to initialize. Check the background script logs.
-- **Objects not listing**: Ensure the background script is running and the message passing is working.
+## Permissions
+
+The extension uses these Firefox permissions:
+
+- **`storage`**: For local state management
+- **`notifications`**: For user notifications
+- **`http://localhost:8080/*`**: To communicate with the local Go server
+- **`http://127.0.0.1:8080/*`**: Alternative localhost access
+
+## Development
+
+### File Structure
+```
+firefox-extension/
+├── manifest.json          # Extension configuration
+├── background.js          # Background script (NATS client management)
+├── popup.html            # Extension popup UI
+├── popup.js              # Popup logic and API calls
+├── nats-client.js        # HTTP client for Go server communication
+└── README.md             # This file
+```
+
+### Debugging
+
+1. **Background Script**: In `about:debugging`, click "Inspect" next to the SoxDrawer extension
+2. **Popup Script**: Right-click on the extension popup and select "Inspect Element"
+3. **Server Logs**: Check the Go server console for request logs
+4. **NATS Logs**: Check the NATS server logs for storage operations
+
+### Common Issues
+
+**"Server: Disconnected"**
+- Ensure the Go server is running on `http://localhost:8080`
+- Check the Go server logs for errors
+- Verify NATS server is running with JetStream enabled
+
+**"Upload Failed"**
+- Check browser console for detailed error messages
+- Ensure the file isn't too large (default limit depends on Go server config)
+- Verify the Go server `/upload` endpoint is responding
+
+**"Permission Denied"**
+- Firefox may block localhost connections - check Firefox settings
+- Ensure the manifest.json permissions are properly configured
 
 ## Future Enhancements
 
-This implementation uses a mock NATS server for demonstration. Future improvements could include:
-- **Real WebSocket Connection**: Connect to an external NATS server via WebSocket proxy
-- **File Upload**: Add functionality to upload files from the popup
-- **Persistent Storage**: Use `browser.storage.local` for more durable storage
-- **Code Bundling**: Use a bundler like Webpack or Rollup for a cleaner build process
+- **Download Files**: Add download functionality to the popup
+- **Drag & Drop**: Support drag-and-drop file uploads
+- **Bulk Operations**: Select and delete multiple files
+- **Search & Filter**: Find files by name or type
+- **Settings Panel**: Configure server URL and connection options
+- **File Preview**: Show thumbnails or preview small text files
+
+## Security Notes
+
+- The extension only connects to localhost (127.0.0.1 and localhost)
+- All communication is over HTTP (consider HTTPS for production)
+- Files are stored in NATS JetStream ObjectStore on the local server
+- No data is sent to external servers
