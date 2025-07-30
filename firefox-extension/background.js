@@ -1,8 +1,3 @@
-// Import the NATS client
-importScripts("nats-client.js");
-
-console.log("SoxDrawer background script loaded");
-
 // Initialize the NATS client
 const natsClient = new ExtensionNATSClient();
 
