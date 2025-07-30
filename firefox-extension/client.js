@@ -1,13 +1,9 @@
-// NATS Client for Firefox Extension - HTTP REST API version
-// Connects to the Go SoxDrawer server via HTTP REST endpoints
-
 class ExtensionNATSClient {
   constructor(config = {}) {
     this.config = {
       serverUrl: config.serverUrl || "http://localhost:8080",
       timeout: config.timeout || 10000,
       retryAttempts: config.retryAttempts || 3,
-      retryDelay: config.retryDelay || 1000,
       ...config,
     };
 
@@ -15,14 +11,11 @@ class ExtensionNATSClient {
     this.connectionError = null;
     this.objectStore = null;
 
-    console.log("🔧 ExtensionNATSClient initialized with config:", this.config);
+    console.log("Client initialized with config:", this.config);
   }
 
   async connect() {
-    console.log("🚀 Attempting to connect to SoxDrawer server...");
-
     try {
-      // Test connection by hitting the root endpoint
       const response = await this.makeRequest("/", {
         method: "GET",
         headers: {
@@ -34,7 +27,6 @@ class ExtensionNATSClient {
         this.connected = true;
         this.connectionError = null;
         this.objectStore = new HTTPObjectStore(this);
-        console.log("✅ Connected to SoxDrawer server");
         return this;
       } else {
         throw new Error(`Server responded with status: ${response.status}`);
@@ -42,7 +34,6 @@ class ExtensionNATSClient {
     } catch (error) {
       this.connected = false;
       this.connectionError = error.message;
-      console.error("❌ Failed to connect to SoxDrawer server:", error);
       throw error;
     }
   }
@@ -50,7 +41,7 @@ class ExtensionNATSClient {
   async disconnect() {
     this.connected = false;
     this.objectStore = null;
-    console.log("🛑 Disconnected from SoxDrawer server");
+    console.log("Disconnected from SoxDrawer server");
   }
 
   isConnected() {
@@ -62,7 +53,7 @@ class ExtensionNATSClient {
       throw new Error("Not connected to SoxDrawer server");
     }
 
-    console.log(`📦 Getting object store: ${bucketName}`);
+    console.log(`Getting object store: ${bucketName}`);
     return this.objectStore;
   }
 
@@ -86,13 +77,13 @@ class ExtensionNATSClient {
       },
     };
 
-    console.log(`🌐 Making request to: ${url}`, requestOptions.method || "GET");
+    console.log(`Request to: ${url}`, requestOptions.method || "GET");
 
     try {
       const response = await fetch(url, requestOptions);
       return response;
     } catch (error) {
-      console.error(`❌ Request failed to ${url}:`, error);
+      console.error(`Request failed to ${url}:`, error);
       throw error;
     }
   }
@@ -102,15 +93,12 @@ class ExtensionNATSClient {
 class HTTPObjectStore {
   constructor(client) {
     this.client = client;
-    console.log("🗃️ HTTPObjectStore initialized");
   }
 
   async put(key, data, metadata = {}) {
     try {
-      // Create FormData for file upload
       const formData = new FormData();
 
-      // Convert data to File/Blob if it's not already
       let fileData;
       if (data instanceof File) {
         fileData = data;
@@ -148,7 +136,7 @@ class HTTPObjectStore {
       }
 
       const result = await response.json();
-      console.log(`✅ Stored object '${key}' (${result.size} bytes)`);
+      console.log(`Stored object '${key}' (${result.size} bytes)`);
 
       return {
         name: result.key,
@@ -157,7 +145,7 @@ class HTTPObjectStore {
         filename: result.filename,
       };
     } catch (error) {
-      console.error(`❌ Failed to store object '${key}':`, error);
+      console.error(`Failed to store object '${key}':`, error);
       throw error;
     }
   }

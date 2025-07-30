@@ -10,7 +10,7 @@
   "host_permissions": ["*://localhost:8080/*", "*://127.0.0.1:8080/*"],
 
   "background": {
-    "scripts": ["nats-client.js", "background.js"]
+    "scripts": ["client.js", "background.js"]
   },
 
   "sidebar_action": {

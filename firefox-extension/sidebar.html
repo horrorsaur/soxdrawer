@@ -252,9 +252,7 @@
                     <button class="button" id="refreshStatusBtn" style="margin-left: auto;">Refresh Status</button>
                 </div>
 
-                <h1>Welcome to SoxDrawer</h1>
-                <p>A NATS-powered object storage service that allows you to upload, store, and retrieve files
-                    efficiently.</p>
+                <h1>SoxDrawer Storage</h1>
 
                 <h2>Upload a File</h2>
 
@@ -281,21 +279,16 @@
         <div id="listPage" class="page">
             <div class="card">
                 <h1>Stored Objects</h1>
-                <button class="button" id="refreshListBtn" disabled>Refresh List</button>
-
+                <button class="button" id="refreshListBtn" disabled>Refresh</button>
                 <div id="objectsContainer">
-                    <div class="loading">Click "Refresh List" to view stored files</div>
-                </div>
-
-                <div style="margin-top: 20px;">
-                    <a href="#" id="backToHomeLink" class="button">Upload More Files</a>
+                    <div class="loading"></div>
                 </div>
             </div>
         </div>
     </main>
 
     <footer class="footer">
-        <p>SoxDrawer - A NATS-powered object storage service</p>
+        <p>soxdrawer - a local object storage service</p>
     </footer>
 
     <script src="sidebar.js"></script>

@@ -1,17 +1,12 @@
-// Initialize the NATS client
 const natsClient = new ExtensionNATSClient();
 
-// Function to start the NATS server connection
 async function startNATS() {
   try {
-    console.log("Connecting to SoxDrawer Go server...");
     await natsClient.connect();
-    console.log("✅ Connection to Go server successful");
-
-    // Store connection status
+    console.log("SoxDrawer server seems up");
     browser.storage.local.set({ natsStatus: "connected" });
   } catch (error) {
-    console.error("❌ Failed to connect to Go server:", error);
+    console.error("Failed to connect to SoxDrawer: ", error);
     browser.storage.local.set({ natsStatus: "error" });
   }
 }
