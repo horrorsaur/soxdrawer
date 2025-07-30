@@ -13,8 +13,9 @@
     "scripts": ["nats-client.js", "background.js"]
   },
 
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "soxdrawer - local object storage"
+  "sidebar_action": {
+    "default_title": "soxdrawer - local object storage",
+    "default_panel": "popup.html",
+    "open_at_install": true
   }
 }

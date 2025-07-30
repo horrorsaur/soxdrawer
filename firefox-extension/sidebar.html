@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <link rel="css" type="" href="sidebar.css">
+</head>
+
+<body>
+  <div class="header">
+    <h1>🧦 SoxDrawer</h1>
+  </div>
+
+  <div class="content">
+    <div class="section">
+      <h3>Server Status</h3>
+      <div class="status">
+        <span id="serverIndicator" class="status-indicator"></span>
+        <span>Server: <span id="serverStatus"></span></span>
+      </div>
+      <button class="button" id="refreshStatusBtn">Refresh</button>
+    </div>
+
+    <div class="section">
+      <h3>Upload</h3>
+      <div id="dropZone">
+        <p>Drag & Drop files, text, or images here</p>
+      </div>
+      <div id="uploadResult" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="section">
+      <h3>Objects</h3>
+      <button class="button" id="listObjectsBtn" disabled>Refresh List</button>
+      <div id="objectsContainer">
+        <div class="loading">Click "Refresh List" to view files</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="sidebar.js"></script>
+</body>
+
+</html>
