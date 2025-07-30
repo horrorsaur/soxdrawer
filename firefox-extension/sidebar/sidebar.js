@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const listPage = document.getElementById("listPage");
   const homeTab = document.getElementById("homeTab");
   const listTab = document.getElementById("listTab");
-  const backToHomeLink = document.getElementById("backToHomeLink");
 
   let isConnected = false;
 
@@ -40,7 +39,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   homeTab.addEventListener("click", () => showPage("homePage"));
   listTab.addEventListener("click", () => showPage("listPage"));
-  backToHomeLink.addEventListener("click", () => showPage("homePage"));
 
   // --- Status and Connection ---
   function updateStatus(status) {

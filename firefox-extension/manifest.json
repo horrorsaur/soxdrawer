@@ -15,7 +15,7 @@
 
   "sidebar_action": {
     "default_title": "soxdrawer - local object storage",
-    "default_panel": "sidebar.html",
+    "default_panel": "sidebar/sidebar.html",
     "open_at_install": false
   }
 }
