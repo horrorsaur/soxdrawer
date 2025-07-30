@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="utf-8">
   <style>
@@ -12,19 +11,20 @@
       font-family: Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      transition: background-color 0.2s;
     }
-
+    
     .header {
       text-align: center;
       margin-bottom: 20px;
     }
-
+    
     .header h1 {
       margin: 0;
       font-size: 24px;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
-
+    
     .content {
       background: rgba(255, 255, 255, 0.1);
       border-radius: 8px;
@@ -32,14 +32,33 @@
       backdrop-filter: blur(10px);
       margin-bottom: 10px;
     }
-
+    
     .section {
       margin-bottom: 15px;
     }
-
+    
     .section h3 {
       margin: 0 0 10px 0;
       font-size: 16px;
+    }
+    
+    #dropZone {
+      border: 2px dashed rgba(255, 255, 255, 0.5);
+      border-radius: 8px;
+      padding: 25px;
+      text-align: center;
+      transition: background-color 0.2s, border-color 0.2s;
+      font-size: 16px;
+    }
+
+    #dropZone.drag-over {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.8);
+    }
+    
+    #dropZone p {
+        margin: 0;
+        pointer-events: none; /* Make text non-interactive during drag */
     }
 
     .status {
@@ -49,29 +68,22 @@
       font-size: 14px;
       margin: 5px 0;
     }
-
+    
     .status-indicator {
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      display: inline-block;
     }
-
+    
     .status-connected {
       background-color: #28a745;
       box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
     }
-
+    
     .status-disconnected {
       background-color: #dc3545;
-      box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
     }
-
-    .status-connecting {
-      background-color: #ffc107;
-      box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
-    }
-
+    
     .button {
       background: rgba(255, 255, 255, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.3);
@@ -83,37 +95,16 @@
       margin: 5px 5px 5px 0;
       transition: background 0.2s;
     }
-
+    
     .button:hover:not(:disabled) {
       background: rgba(255, 255, 255, 0.3);
     }
-
+    
     .button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
-
-    .upload-section {
-      border: 2px dashed rgba(255, 255, 255, 0.3);
-      border-radius: 8px;
-      padding: 15px;
-      text-align: center;
-      margin: 10px 0;
-    }
-
-    .file-input {
-      margin: 10px 0;
-    }
-
-    .file-input input[type="file"] {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 4px;
-      padding: 8px;
-      color: white;
-      width: 100%;
-    }
-
+    
     .objects-list {
       max-height: 150px;
       overflow-y: auto;
@@ -122,7 +113,7 @@
       padding: 10px;
       margin-top: 10px;
     }
-
+    
     .object-item {
       display: flex;
       justify-content: space-between;
@@ -133,110 +124,80 @@
       border-radius: 3px;
       font-size: 12px;
     }
-
+    
     .object-info {
       flex-grow: 1;
+      word-break: break-all;
     }
-
+    
     .object-name {
       font-weight: bold;
-      margin-bottom: 2px;
     }
-
+    
     .object-details {
       opacity: 0.8;
       font-size: 11px;
     }
-
-    .object-actions {
-      display: flex;
-      gap: 5px;
-    }
-
-    .small-button {
-      padding: 4px 8px;
-      font-size: 11px;
-      min-width: auto;
-    }
-
+    
     .delete-button {
       background: rgba(220, 53, 69, 0.3);
       border-color: rgba(220, 53, 69, 0.5);
+      padding: 4px 8px;
+      font-size: 11px;
     }
-
-    .delete-button:hover {
-      background: rgba(220, 53, 69, 0.5);
-    }
-
-    .loading {
+    
+    .loading, .error, .success {
       text-align: center;
-      font-style: italic;
-      opacity: 0.8;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin: 5px 0;
     }
-
+    
     .error {
       color: #ffcccb;
       background: rgba(220, 53, 69, 0.2);
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      margin: 5px 0;
     }
-
+    
     .success {
       color: #d4edda;
       background: rgba(40, 167, 69, 0.2);
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      margin: 5px 0;
     }
 
-    .connection-info {
-      font-size: 11px;
-      opacity: 0.8;
-      margin-top: 5px;
-    }
   </style>
 </head>
-
 <body>
   <div class="header">
     <h1>🧦 SoxDrawer</h1>
   </div>
-
+  
   <div class="content">
     <div class="section">
       <h3>Server Status</h3>
       <div class="status">
-        <span id="serverIndicator" class="status-indicator status-connecting"></span>
-        <span>Server: <span id="serverStatus">Connecting...</span></span>
+        <span id="serverIndicator" class="status-indicator"></span>
+        <span>Server: <span id="serverStatus"></span></span>
       </div>
-      <div id="connectionInfo" class="connection-info"></div>
-      <button class="button" id="refreshStatusBtn">Refresh Status</button>
+      <button class="button" id="refreshStatusBtn">Refresh</button>
     </div>
-
+    
     <div class="section">
-      <h3>Upload File</h3>
-      <div class="upload-section">
-        <div class="file-input">
-          <input type="file" id="fileInput" accept="*/*">
-        </div>
-        <button class="button" id="uploadBtn" disabled>Upload File</button>
+      <h3>Upload</h3>
+      <div id="dropZone">
+        <p>Drag & Drop files, text, or images here</p>
       </div>
-      <div id="uploadResult"></div>
+      <div id="uploadResult" style="margin-top:10px;"></div>
     </div>
-
+    
     <div class="section">
       <h3>Objects</h3>
       <button class="button" id="listObjectsBtn" disabled>Refresh List</button>
       <div id="objectsContainer">
-        <div class="loading">Click "Refresh List" to view stored files</div>
+        <div class="loading">Click "Refresh List" to view files</div>
       </div>
     </div>
   </div>
-
+  
   <script src="popup.js"></script>
 </body>
-
 </html>

@@ -1,21 +1,16 @@
 document.addEventListener("DOMContentLoaded", function () {
   console.log("SoxDrawer popup loaded");
 
-  // DOM elements
   const serverIndicator = document.getElementById("serverIndicator");
   const serverStatus = document.getElementById("serverStatus");
-  const connectionInfo = document.getElementById("connectionInfo");
   const refreshStatusBtn = document.getElementById("refreshStatusBtn");
   const listObjectsBtn = document.getElementById("listObjectsBtn");
   const objectsContainer = document.getElementById("objectsContainer");
-  const fileInput = document.getElementById("fileInput");
-  const uploadBtn = document.getElementById("uploadBtn");
+  const dropZone = document.getElementById("dropZone");
   const uploadResult = document.getElementById("uploadResult");
 
-  // State management
   let isConnected = false;
 
-  // Update status display
   function updateStatus(status) {
     isConnected = status.connected;
 
@@ -23,23 +18,19 @@ document.addEventListener("DOMContentLoaded", function () {
       serverIndicator.className = "status-indicator status-connected";
       serverStatus.textContent = "Connected";
       listObjectsBtn.disabled = false;
-      uploadBtn.disabled = false;
+      dropZone.style.pointerEvents = "auto";
+      dropZone.querySelector("p").textContent =
+        "Drag & Drop files, text, or images here";
     } else {
       serverIndicator.className = "status-indicator status-disconnected";
       serverStatus.textContent = "Disconnected";
       listObjectsBtn.disabled = true;
-      uploadBtn.disabled = true;
-    }
-
-    if (status.connectionInfo) {
-      connectionInfo.innerHTML = `
-        <div>Server: ${status.connectionInfo.server || "N/A"}</div>
-        <div style="color: #ffcccb;">${status.connectionInfo.error || ""}</div>
-      `;
+      dropZone.style.pointerEvents = "none";
+      dropZone.querySelector("p").textContent =
+        "Connect to server to enable uploads";
     }
   }
 
-  // Display objects list
   function displayObjects(objects) {
     if (objects.length === 0) {
       objectsContainer.innerHTML =
@@ -47,29 +38,24 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const objectsHtml = objects
-      .map(
-        (obj) => `
-      <div class="object-item">
-        <div class="object-info">
-          <div class="object-name">${obj.name}</div>
-          <div class="object-details">Size: ${obj.size} bytes | Created: ${new Date(obj.created).toLocaleString()}</div>
-        </div>
-        <div class="object-actions">
-          <button class="button small-button delete-button" data-key="${obj.name}">Delete</button>
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
     objectsContainer.innerHTML = `
       <div class="objects-list">
-        ${objectsHtml}
+        ${objects
+          .map(
+            (obj) => `
+          <div class="object-item">
+            <div class="object-info">
+              <div class="object-name">${obj.name}</div>
+              <div class="object-details">Size: ${obj.size} bytes | Created: ${new Date(obj.created).toLocaleString()}</div>
+            </div>
+            <button class="button delete-button" data-key="${obj.name}">Delete</button>
+          </div>
+        `,
+          )
+          .join("")}
       </div>
     `;
 
-    // Add event listeners to delete buttons
     document.querySelectorAll(".delete-button").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const key = e.target.dataset.key;
@@ -80,18 +66,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Show feedback message (success or error)
   function showFeedback(element, message, isError = false) {
     element.className = isError ? "error" : "success";
     element.textContent = message;
-
     setTimeout(() => {
       element.textContent = "";
       element.className = "";
     }, 5000);
   }
 
-  // Send message to background script
   function sendMessage(action, data = {}) {
     return new Promise((resolve, reject) => {
       browser.runtime.sendMessage({ action, ...data }, (response) => {
@@ -106,39 +89,21 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Get status from background script
   async function refreshStatus() {
     try {
-      console.log("Requesting status from background...");
       const response = await sendMessage("get_status");
-      console.log("Status response:", response);
-
-      if (response && response.data) {
-        updateStatus(response.data);
-      }
+      updateStatus(response.data);
     } catch (error) {
-      console.error("Error getting status:", error);
-      updateStatus({
-        connected: false,
-        connectionInfo: { error: error.message },
-      });
+      updateStatus({ connected: false });
     }
   }
 
-  // List objects from background script
   async function listObjects() {
     try {
-      objectsContainer.innerHTML =
-        '<div class="loading">Loading objects...</div>';
-
-      console.log("Requesting objects list from background...");
+      objectsContainer.innerHTML = "<div class='loading'>Loading...</div>";
       const response = await sendMessage("list_objects");
-
-      if (response && response.data) {
-        displayObjects(response.data);
-      }
+      displayObjects(response.data);
     } catch (error) {
-      console.error("Error listing objects:", error);
       showFeedback(
         objectsContainer,
         `Failed to list objects: ${error.message}`,
@@ -147,38 +112,25 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // Delete an object
   async function deleteObject(key) {
     try {
-      console.log(`Requesting to delete object: ${key}`);
       await sendMessage("delete_object", { key });
-
-      showFeedback(objectsContainer, `Object '${key}' deleted successfully`);
-      // Refresh the list after deletion
+      showFeedback(uploadResult, `Object '${key}' deleted successfully`);
       listObjects();
     } catch (error) {
-      console.error("Error deleting object:", error);
-      showFeedback(
-        objectsContainer,
-        `Failed to delete object: ${error.message}`,
-        true,
-      );
+      showFeedback(uploadResult, `Failed to delete: ${error.message}`, true);
     }
   }
 
-  // Upload a file
-  async function uploadFile() {
-    const file = fileInput.files[0];
-    if (!file) {
-      showFeedback(uploadResult, "Please select a file to upload", true);
-      return;
-    }
-
-    uploadBtn.disabled = true;
-    uploadBtn.textContent = "Uploading...";
-
+  async function uploadFile(file) {
     try {
-      const arrayBuffer = await file.arrayBuffer();
+      const arrayBuffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(file);
+      });
+
       const fileData = {
         data: Array.from(new Uint8Array(arrayBuffer)),
         name: file.name,
@@ -187,31 +139,98 @@ document.addEventListener("DOMContentLoaded", function () {
       };
 
       const response = await sendMessage("upload_file", { data: fileData });
-
       showFeedback(
         uploadResult,
-        `File '${response.data.filename}' uploaded as '${response.data.name}'`,
+        `Uploaded '${response.data.filename}' as '${response.data.name}'`,
       );
-
-      // Refresh the list after upload
       listObjects();
     } catch (error) {
-      console.error("Upload failed:", error);
       showFeedback(uploadResult, `Upload failed: ${error.message}`, true);
-    } finally {
-      uploadBtn.disabled = false;
-      uploadBtn.textContent = "Upload File";
-      fileInput.value = ""; // Clear file input
     }
   }
 
-  // Event listeners
+  // --- Drag and Drop Logic ---
+  dropZone.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isConnected) dropZone.classList.add("drag-over");
+  });
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  dropZone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("drag-over");
+  });
+
+  dropZone.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("drag-over");
+
+    if (!isConnected) return;
+
+    const dt = e.dataTransfer;
+    if (!dt) return;
+
+    // Handle dropped files
+    if (dt.files && dt.files.length > 0) {
+      showFeedback(uploadResult, `Uploading ${dt.files.length} file(s)...`);
+      for (const file of dt.files) {
+        await uploadFile(file);
+      }
+      return;
+    }
+
+    // Handle dropped text
+    const textData = dt.getData("text/plain");
+    if (textData) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const file = new File([textData], `snippet-${timestamp}.txt`, {
+        type: "text/plain",
+      });
+      await uploadFile(file);
+      return;
+    }
+
+    // Handle dropped HTML (e.g., images from a webpage)
+    const htmlData = dt.getData("text/html");
+    if (htmlData) {
+      const imgMatch = htmlData.match(/<img.*?src="(.*?)".*?>/);
+      if (imgMatch && imgMatch[1]) {
+        try {
+          const imageUrl = imgMatch[1];
+          showFeedback(uploadResult, "Downloading image to upload...");
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+          const ext = blob.type.split("/")[1] || "png";
+          const file = new File([blob], `image-${timestamp}.${ext}`, {
+            type: blob.type,
+          });
+          await uploadFile(file);
+        } catch (error) {
+          showFeedback(
+            uploadResult,
+            `Failed to download image: ${error.message}`,
+            true,
+          );
+        }
+        return;
+      }
+    }
+
+    showFeedback(uploadResult, "Unsupported data type dropped.", true);
+  });
+
   refreshStatusBtn.addEventListener("click", refreshStatus);
   listObjectsBtn.addEventListener("click", listObjects);
-  uploadBtn.addEventListener("click", uploadFile);
 
-  // Initial status check
   refreshStatus();
 
-  console.log("SoxDrawer popup initialized");
+  console.log("SoxDrawer popup initialized with drag and drop");
 });
