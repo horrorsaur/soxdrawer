@@ -1,28 +1,20 @@
 {
   "manifest_version": 2,
-  "name": "SoxDrawer",
+  "name": "soxdrawer",
   "version": "1.0.1",
   "description": "A NATS-powered object storage service extension",
-  
-  "permissions": [
-    "storage",
-    "notifications",
-    "http://localhost:8080/*",
-    "http://127.0.0.1:8080/*"
-  ],
-  
+
+  "permissions": ["storage", "notifications", "http://localhost/*"],
+
   "background": {
-    "scripts": [
-      "nats-client.js",
-      "background.js"
-    ],
+    "scripts": ["nats-client.js", "background.js"],
     "persistent": false
   },
-  
+
   "browser_action": {
     "default_popup": "popup.html",
     "default_title": "SoxDrawer - NATS Object Storage"
   },
-  
-  "content_security_policy": "script-src 'self'; object-src 'self'; connect-src http://localhost:8080 http://127.0.0.1:8080"
+
+  "content_security_policy": "script-src 'self'; object-src 'self'; connect-src http://localhost/* http://127.0.0.1/*"
 }
