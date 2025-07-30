@@ -42,7 +42,7 @@ type (
 
 func DefaultConfig() *Config {
 	return &Config{
-		Address: ":8000",
+		Address: ":8080",
 	}
 }
 
