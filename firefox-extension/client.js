@@ -150,48 +150,6 @@ class HTTPObjectStore {
     }
   }
 
-  async get(key) {
-    try {
-      const response = await this.client.makeRequest(
-        `/download/${encodeURIComponent(key)}`,
-        {
-          method: "GET",
-        },
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Object '${key}' not found`);
-        }
-        throw new Error(
-          `Download failed: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const data = await response.arrayBuffer();
-      const contentType =
-        response.headers.get("content-type") || "application/octet-stream";
-      const contentLength = response.headers.get("content-length");
-
-      console.log(`✅ Retrieved object '${key}' (${data.byteLength} bytes)`);
-
-      return {
-        data: new Uint8Array(data),
-        info: {
-          name: key,
-          size: data.byteLength,
-          contentType: contentType,
-          contentLength: contentLength
-            ? parseInt(contentLength)
-            : data.byteLength,
-        },
-      };
-    } catch (error) {
-      console.error(`❌ Failed to get object '${key}':`, error);
-      throw error;
-    }
-  }
-
   async getString(key) {
     const result = await this.get(key);
     return new TextDecoder().decode(result.data);
