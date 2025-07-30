@@ -57,13 +57,14 @@ func New(config *Config, objectStore *store.ObjectStore) *Server {
 // Start starts the HTTP server with routes
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/", s.indexHandler)
 	mux.HandleFunc("/list", s.listHandler)
 	mux.HandleFunc("/upload", s.uploadHandler)
 
 	s.server = &http.Server{
 		Addr:    s.Address,
-		Handler: mux,
+		Handler: corsMiddleware(mux),
 	}
 
 	log.Printf("Starting HTTP server on %s", s.Address)
