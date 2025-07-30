@@ -4,7 +4,12 @@
   "version": "1.0.1",
   "description": "A NATS-powered object storage service extension",
 
-  "permissions": ["storage", "notifications", "http://localhost/*"],
+  "permissions": [
+    "storage",
+    "notifications",
+    "http://localhost/*",
+    "webRequest"
+  ],
 
   "background": {
     "scripts": ["nats-client.js", "background.js"],
@@ -14,7 +19,5 @@
   "browser_action": {
     "default_popup": "popup.html",
     "default_title": "SoxDrawer - NATS Object Storage"
-  },
-
-  "content_security_policy": "script-src 'self'; object-src 'self'; connect-src http://localhost/* http://127.0.0.1/*"
+  }
 }
