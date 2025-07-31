@@ -1,0 +1,13 @@
+{
+  "name": "soxdrawer",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@nats-io/nats-core": "npm:@jsr/nats-io__nats-core"
+  }
+}
