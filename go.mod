@@ -3,12 +3,12 @@ module soxdrawer
 go 1.24.4
 
 require (
+	github.com/a-h/templ v0.3.924
 	github.com/nats-io/nats-server/v2 v2.11.6
-	github.com/nats-io/nats.go v1.43.0
+	github.com/nats-io/nats.go v1.44.0
 )
 
 require (
-	github.com/a-h/templ v0.3.924 // indirect
 	github.com/google/go-tpm v0.9.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect

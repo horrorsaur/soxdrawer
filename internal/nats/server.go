@@ -6,16 +6,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/nats-io/nats-server/v2/server"
+	natsServer "github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 )
 
 type (
 	NATSServer struct {
-		server *server.Server
+		server *natsServer.Server
 		conn   *nats.Conn
 		js     nats.JetStreamContext
-		opts   *server.Options
+		opts   *natsServer.Options
 	}
 
 	Config struct {
@@ -34,18 +34,14 @@ func DefaultConfig() *Config {
 }
 
 func NewServer(config *Config) (*NATSServer, error) {
-	opts := &server.Options{
+	opts := &natsServer.Options{
 		Host:      config.Host,
 		Port:      config.Port,
 		JetStream: true,
 		StoreDir:  config.StoreDir,
-		// Websocket: server.WebsocketOpts{
-		// 	Port:  5000,
-		// 	NoTLS: true,
-		// },
 	}
 
-	ns, err := server.NewServer(opts)
+	ns, err := natsServer.NewServer(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create NATS server: %w", err)
 	}
