@@ -1,0 +1,51 @@
+package templates
+
+import "soxdrawer/internal/store"
+import "fmt"
+
+templ ListPage(objects []*store.ObjectInfo) {
+	<div class="bg-white rounded-lg shadow-md p-8 mb-8">
+		<h1 class="text-3xl font-bold mb-6">Stored Objects</h1>
+		if len(objects) == 0 {
+			<p class="text-gray-600">No objects found.</p>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="w-full border-collapse">
+					<thead>
+						<tr class="bg-gray-50">
+							<th class="p-3 text-left border-b-2 border-gray-200 font-semibold">Name</th>
+							<th class="p-3 text-left border-b-2 border-gray-200 font-semibold">Size</th>
+							<th class="p-3 text-left border-b-2 border-gray-200 font-semibold">Modified</th>
+							<th class="p-3 text-left border-b-2 border-gray-200 font-semibold">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, obj := range objects {
+							<tr class="border-b border-gray-200 hover:bg-gray-50">
+								<td class="p-3">{ obj.Name }</td>
+								<td class="p-3">{ fmt.Sprintf("%d bytes", obj.Size) }</td>
+								<td class="p-3">{ obj.Created.Format("2006-01-02 15:04:05") }</td>
+								<td class="p-3">
+									<a
+										href={ templ.URL("/download/" + obj.Name) }
+										class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded transition-colors mr-2"
+									>Download</a>
+									<button
+										class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition-colors"
+										hx-delete={ "/delete/" + obj.Name }
+										hx-confirm={ "Are you sure you want to delete \"" + obj.Name + "\"?" }
+										hx-target="body"
+										hx-swap="outerHTML"
+									>Delete</button>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		<div class="mt-6">
+			<a href="/" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors no-underline">Upload More Files</a>
+		</div>
+	</div>
+}
