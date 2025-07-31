@@ -4,38 +4,46 @@ import "soxdrawer/internal/store"
 import "fmt"
 
 templ ListPage(objects []*store.ObjectInfo) {
-	<div class="card">
-		<h1>Stored Objects</h1>
+	<div class="bg-white rounded-lg shadow-sm border p-8">
+		<div class="flex items-center justify-between mb-6">
+			<h1 class="text-2xl font-semibold text-gray-900">Stored Files</h1>
+			<a href="/" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Upload Files</a>
+		</div>
+		
 		if len(objects) == 0 {
-			<p>No objects found.</p>
+			<div class="text-center py-12">
+				<div class="text-4xl text-gray-300 mb-4">📁</div>
+				<p class="text-gray-500">No files uploaded yet</p>
+				<a href="/" class="inline-block mt-4 text-blue-600 hover:text-blue-700 font-medium">Upload your first file</a>
+			</div>
 		} else {
-			<div style="overflow-x: auto;">
-				<table style="width: 100%; border-collapse: collapse;">
+			<div class="overflow-x-auto">
+				<table class="w-full">
 					<thead>
-						<tr style="background-color: #f8f9fa;">
-							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Name</th>
-							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Size</th>
-							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Modified</th>
-							<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Actions</th>
+						<tr class="border-b border-gray-200">
+							<th class="text-left py-3 px-4 font-medium text-gray-900">Name</th>
+							<th class="text-left py-3 px-4 font-medium text-gray-900">Size</th>
+							<th class="text-left py-3 px-4 font-medium text-gray-900">Modified</th>
+							<th class="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
 						</tr>
 					</thead>
-					<tbody>
+					<tbody class="divide-y divide-gray-100">
 						for _, obj := range objects {
-							<tr style="border-bottom: 1px solid #dee2e6;">
-								<td style="padding: 12px;">{ obj.Name }</td>
-								<td style="padding: 12px;">{ fmt.Sprintf("%d bytes", obj.Size) }</td>
-								<td style="padding: 12px;">{ obj.Created.Format("2006-01-02 15:04:05") }</td>
-								<td style="padding: 12px;">
-									<a
-										href={ templ.URL("/download/" + obj.Name) }
-										class="button button-secondary"
-										style="margin-right: 8px;"
-									>Download</a>
-									<button
-										class="button"
-										style="background-color: #dc3545;"
-										onclick={ templ.ComponentScript{Call: "deleteObject('" + obj.Name + "')"} }
-									>Delete</button>
+							<tr class="hover:bg-gray-50">
+								<td class="py-3 px-4 text-gray-900 font-medium">{ obj.Name }</td>
+								<td class="py-3 px-4 text-gray-600">{ fmt.Sprintf("%d bytes", obj.Size) }</td>
+								<td class="py-3 px-4 text-gray-600">{ obj.Created.Format("2006-01-02 15:04:05") }</td>
+								<td class="py-3 px-4">
+									<div class="flex gap-2">
+										<a
+											href={ templ.URL("/download/" + obj.Name) }
+											class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors"
+										>Download</a>
+										<button
+											class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm font-medium transition-colors"
+											onclick={ templ.ComponentScript{Call: "deleteObject('" + obj.Name + "')"} }
+										>Delete</button>
+									</div>
 								</td>
 							</tr>
 						}
@@ -43,9 +51,6 @@ templ ListPage(objects []*store.ObjectInfo) {
 				</table>
 			</div>
 		}
-		<div style="margin-top: 20px;">
-			<a href="/" class="button">Upload More Files</a>
-		</div>
 	</div>
 	<script>
     function deleteObject(name) {
