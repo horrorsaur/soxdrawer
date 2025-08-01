@@ -7,12 +7,10 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"soxdrawer/internal/store"
-	"soxdrawer/internal/templates"
 )
 
 type (
@@ -91,10 +89,7 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // indexHandler handles the homepage
 func (s *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
-	err := templates.BaseLayout("Home", templates.HomePage()).Render(r.Context(), w)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	s.sendJSONResponse(w, http.StatusOK, "server is up")
 }
 
 // listHandler handles the list endpoint
@@ -111,24 +106,13 @@ func (s *Server) listHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonParam, _ := strconv.ParseBool(r.URL.Query().Get("json"))
-	if jsonParam {
-		response := ListResponse{
-			Status:  "success",
-			Message: "",
-			Objects: objects,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
-		return
+	response := ListResponse{
+		Status:  "success",
+		Message: "",
+		Objects: objects,
 	}
 
-	err = templates.BaseLayout("List", templates.ListPage(objects)).Render(r.Context(), w)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	s.sendJSONResponse(w, http.StatusOK, response)
 }
 
 // uploadHandler handles the file upload endpoint
@@ -172,7 +156,6 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Successfully uploaded file %s (size: %d bytes)", key, info.Size)
-
 	response := UploadResponse{
 		Status:   "success",
 		Message:  "File uploaded successfully",
@@ -180,10 +163,7 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		Size:     int64(info.Size),
 		Filename: filename,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	s.sendJSONResponse(w, http.StatusOK, response)
 }
 
 // sendErrorResponse sends a JSON error response
@@ -196,6 +176,12 @@ func (s *Server) sendErrorResponse(w http.ResponseWriter, message string, status
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) sendJSONResponse(w http.ResponseWriter, statusCode int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(payload)
 }
 
 // sanitizeFilename removes potentially dangerous characters from filenames
