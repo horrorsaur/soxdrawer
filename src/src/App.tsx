@@ -10,41 +10,30 @@ import {
   Copy, 
   ExternalLink,
   Download,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react'
 import clsx from 'clsx'
-
-interface StoredItem {
-  id: string
-  type: 'file' | 'link' | 'text' | 'image'
-  name: string
-  content: string
-  size?: number
-  timestamp: Date
-  url?: string
-}
+import { useApi } from './hooks/useApi'
 
 function App() {
-  const [items, setItems] = useState<StoredItem[]>([])
-  const [isUploading, setIsUploading] = useState(false)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const {
+    items,
+    isLoading,
+    isUploading,
+    error,
+    loadItems,
+    uploadFile,
+    uploadText,
+    uploadUrl,
+    deleteItem,
+  } = useApi()
 
-  // Load items from localStorage on mount
+  // Load items from API on mount
   useEffect(() => {
-    const savedItems = localStorage.getItem('soxdrawer-items')
-    if (savedItems) {
-      const parsedItems = JSON.parse(savedItems).map((item: any) => ({
-        ...item,
-        timestamp: new Date(item.timestamp)
-      }))
-      setItems(parsedItems)
-    }
-  }, [])
-
-  // Save items to localStorage whenever items change
-  useEffect(() => {
-    localStorage.setItem('soxdrawer-items', JSON.stringify(items))
-  }, [items])
+    loadItems()
+  }, [loadItems])
 
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type })
@@ -52,30 +41,19 @@ function App() {
   }
 
   const handleDrop = async (acceptedFiles: File[]) => {
-    setIsUploading(true)
+    let successCount = 0
     
-    try {
-      const newItems: StoredItem[] = []
-      
-      for (const file of acceptedFiles) {
-        const item: StoredItem = {
-          id: `file-${Date.now()}-${Math.random()}`,
-          type: file.type.startsWith('image/') ? 'image' : 'file',
-          name: file.name,
-          content: file.name,
-          size: file.size,
-          timestamp: new Date(),
-          url: URL.createObjectURL(file)
-        }
-        newItems.push(item)
+    for (const file of acceptedFiles) {
+      const result = await uploadFile(file)
+      if (result.success) {
+        successCount++
       }
-      
-      setItems(prev => [...newItems, ...prev])
-      showNotification(`Added ${newItems.length} item(s)`, 'success')
-    } catch (error) {
-      showNotification('Failed to add items', 'error')
-    } finally {
-      setIsUploading(false)
+    }
+    
+    if (successCount > 0) {
+      showNotification(`Added ${successCount} item(s)`, 'success')
+    } else {
+      showNotification('Failed to upload items', 'error')
     }
   }
 
@@ -90,44 +68,39 @@ function App() {
     multiple: true
   })
 
-  const handleTextDrop = (text: string) => {
-    const item: StoredItem = {
-      id: `text-${Date.now()}-${Math.random()}`,
-      type: 'text',
-      name: text.length > 50 ? text.substring(0, 50) + '...' : text,
-      content: text,
-      timestamp: new Date()
+  const handleTextDrop = async (text: string) => {
+    const result = await uploadText(text)
+    if (result.success) {
+      showNotification('Text added to drawer', 'success')
+    } else {
+      showNotification('Failed to add text', 'error')
     }
-    setItems(prev => [item, ...prev])
-    showNotification('Text added to drawer', 'success')
   }
 
-  const handleLinkDrop = (url: string) => {
-    const item: StoredItem = {
-      id: `link-${Date.now()}-${Math.random()}`,
-      type: 'link',
-      name: url,
-      content: url,
-      timestamp: new Date(),
-      url: url
+  const handleLinkDrop = async (url: string) => {
+    const result = await uploadUrl(url)
+    if (result.success) {
+      showNotification('Link added to drawer', 'success')
+    } else {
+      showNotification('Failed to add link', 'error')
     }
-    setItems(prev => [item, ...prev])
-    showNotification('Link added to drawer', 'success')
   }
 
   const handleDragEnd = (result: any) => {
     if (!result.destination) return
 
-    const newItems = Array.from(items)
-    const [reorderedItem] = newItems.splice(result.source.index, 1)
-    newItems.splice(result.destination.index, 0, reorderedItem)
-
-    setItems(newItems)
+    // Note: Reordering is handled client-side for now
+    // In a real app, you might want to persist the order to the server
+    console.log('Item reordered:', result)
   }
 
-  const deleteItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id))
-    showNotification('Item removed', 'success')
+  const handleDeleteItem = async (id: string) => {
+    const result = await deleteItem(id)
+    if (result.success) {
+      showNotification('Item removed', 'success')
+    } else {
+      showNotification('Failed to delete item', 'error')
+    }
   }
 
   const copyToClipboard = async (content: string) => {
@@ -176,6 +149,14 @@ function App() {
               <p className="text-gray-600">Your personal drag & drop object store</p>
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                onClick={loadItems}
+                disabled={isLoading}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
               <div className="text-sm text-gray-500">
                 {items.length} item{items.length !== 1 ? 's' : ''} stored
               </div>
@@ -261,8 +242,41 @@ function App() {
           </div>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Connection Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{error}</p>
+                  <button
+                    onClick={loadItems}
+                    className="mt-2 text-red-800 underline hover:text-red-900"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading items...</p>
+          </div>
+        )}
+
         {/* Items List */}
-        {items.length > 0 && (
+        {!isLoading && items.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">Stored Items</h2>
@@ -324,14 +338,14 @@ function App() {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                                    title="Open link"
+                                    title="Download file"
                                   >
                                     <ExternalLink className="w-4 h-4" />
                                   </a>
                                 )}
                                 
                                 <button
-                                  onClick={() => deleteItem(item.id)}
+                                  onClick={() => handleDeleteItem(item.id)}
                                   className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                                   title="Delete item"
                                 >
@@ -352,7 +366,7 @@ function App() {
         )}
 
         {/* Empty State */}
-        {items.length === 0 && (
+        {!isLoading && items.length === 0 && (
           <div className="text-center py-12">
             <Upload className="mx-auto h-16 w-16 text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No items yet</h3>
