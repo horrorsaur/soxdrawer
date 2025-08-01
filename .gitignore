@@ -36,3 +36,4 @@ jetstream/
 *_templ.go
 
 src/node_modules
+src/dist

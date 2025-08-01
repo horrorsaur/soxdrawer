@@ -125,11 +125,35 @@ The application uses React's built-in state management with:
 
 ## API Integration
 
-The frontend is configured to proxy API requests to the Go backend at `http://localhost:8080`. To integrate with the backend:
+The frontend is now fully integrated with the Go backend! The application communicates with the backend through the following endpoints:
 
-1. Update the proxy configuration in `vite.config.ts`
-2. Create API service functions
-3. Replace localStorage with API calls
+### API Endpoints
+
+- `GET /list?json=true` - List all stored objects
+- `POST /upload` - Upload files, text, or URLs
+- `DELETE /delete/{key}` - Delete an object by key
+- `GET /download/{key}` - Download an object
+- `GET /preview/{key}` - Preview text content
+
+### Features
+
+- **Real-time Sync**: Items are loaded from and saved to the server
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **Loading States**: Visual feedback during API operations
+- **Retry Mechanism**: Users can retry failed operations
+- **File Upload**: Drag and drop files directly to the server
+- **Text/URL Storage**: Quick add text and URLs to the object store
+
+### Backend Requirements
+
+Make sure your Go backend is running on `http://localhost:8080` with the following features:
+
+1. **CORS Support**: The backend should allow requests from the frontend
+2. **File Upload**: Support for multipart form data uploads
+3. **JSON Responses**: API endpoints should return JSON responses
+4. **Object Store**: NATS JetStream object store integration
+
+The frontend automatically proxies API requests to the backend through Vite's development server.
 
 ## Contributing
 
