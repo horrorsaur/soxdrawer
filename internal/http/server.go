@@ -62,6 +62,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/upload", s.uploadHandler)
 	mux.HandleFunc("/delete/", s.deleteHandler)
 	mux.HandleFunc("/download/", s.downloadHandler)
+	mux.HandleFunc("/preview/", s.previewHandler)
 
 	s.server = &http.Server{
 		Addr:    s.Address,
@@ -157,24 +158,37 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// Get content type from form
+	contentType := r.FormValue("type")
+	if contentType == "" {
+		contentType = "file" // Default to file
+	}
+
 	filename := header.Filename
 	if filename == "" {
-		filename = "unnamed_file"
+		switch contentType {
+		case "text":
+			filename = "text.txt"
+		case "url":
+			filename = "url.txt"
+		default:
+			filename = "unnamed_file"
+		}
 	}
 
 	cleanFilename := sanitizeFilename(filename)
 	timestamp := time.Now().Unix()
 	key := fmt.Sprintf("%d_%s", timestamp, cleanFilename)
 
-	log.Printf("Uploading file: %s (original: %s) as key: %s", cleanFilename, filename, key)
+	log.Printf("Uploading %s: %s (original: %s) as key: %s", contentType, cleanFilename, filename, key)
 
 	info, err := s.ObjectStore.PutReader(key, file)
 	if err != nil {
-		log.Printf("Failed to store file %s: %v", key, err)
+		log.Printf("Failed to store %s %s: %v", contentType, key, err)
 		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> Failed to store file
-			</div>`
+			errorHTML := fmt.Sprintf(`<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+				<strong>Error:</strong> Failed to store %s
+			</div>`, contentType)
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(errorHTML))
@@ -184,11 +198,11 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Successfully uploaded file %s (size: %d bytes)", key, info.Size)
+	log.Printf("Successfully uploaded %s %s (size: %d bytes)", contentType, key, info.Size)
 
 	response := UploadResponse{
 		Status:   "success",
-		Message:  "File uploaded successfully",
+		Message:  "Content uploaded successfully",
 		Key:      key,
 		Size:     int64(info.Size),
 		Filename: filename,
@@ -312,6 +326,50 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Failed to write object data: %v", err)
 		http.Error(w, "Failed to download file", http.StatusInternalServerError)
+		return
+	}
+}
+
+// previewHandler handles the preview endpoint
+func (s *Server) previewHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract the key from the URL path
+	path := strings.TrimPrefix(r.URL.Path, "/preview/")
+	if path == "" {
+		http.Error(w, "No key provided", http.StatusBadRequest)
+		return
+	}
+
+	key := strings.TrimSpace(path)
+	log.Printf("Previewing object: %s", key)
+
+	// Get the object from the store
+	data, err := s.ObjectStore.Get(key)
+	if err != nil {
+		log.Printf("Failed to get object %s: %v", key, err)
+		http.Error(w, "Object not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if it's a text file (for preview)
+	if !strings.HasSuffix(key, ".txt") {
+		http.Error(w, "Preview only available for text files", http.StatusBadRequest)
+		return
+	}
+
+	// Set headers for text preview
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+
+	// Write the data to the response
+	_, err = w.Write(data)
+	if err != nil {
+		log.Printf("Failed to write preview data: %v", err)
+		http.Error(w, "Failed to generate preview", http.StatusInternalServerError)
 		return
 	}
 }
