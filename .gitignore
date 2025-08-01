@@ -35,5 +35,5 @@ jetstream/
 # Generated templ files
 *_templ.go
 
-src/node_modules
-src/dist
+web/node_modules
+web/dist
