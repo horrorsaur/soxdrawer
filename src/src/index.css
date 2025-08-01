@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .drag-zone {
+    @apply border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-all duration-200;
+  }
+  
+  .drag-zone.active {
+    @apply border-primary-500 bg-primary-50 scale-105;
+  }
+  
+  .drag-zone.hover {
+    @apply border-primary-400 bg-primary-100;
+  }
+  
+  .item-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all duration-200;
+  }
+  
+  .item-card:hover {
+    @apply border-primary-200 shadow-lg;
+  }
+} 

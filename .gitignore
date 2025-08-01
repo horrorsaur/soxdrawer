@@ -34,3 +34,5 @@ go.work.sum
 jetstream/
 # Generated templ files
 *_templ.go
+
+src/node_modules
