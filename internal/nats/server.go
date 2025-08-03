@@ -2,6 +2,8 @@ package nats
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
@@ -16,12 +18,14 @@ type (
 		conn   *nats.Conn
 		js     nats.JetStreamContext
 		opts   *natsServer.Options
+		token  string
 	}
 
 	Config struct {
 		Host     string
 		Port     int
 		StoreDir string
+		Token    string // Authentication token
 	}
 )
 
@@ -30,15 +34,42 @@ func DefaultConfig() *Config {
 		Host:     "127.0.0.1",
 		Port:     4222,
 		StoreDir: "./jetstream",
+		Token:    "", // Will be generated if empty
 	}
 }
 
+// GenerateToken creates a secure random token for NATS authentication
+func GenerateToken() (string, error) {
+	bytes := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
 func NewServer(config *Config) (*NATSServer, error) {
+	token := config.Token
+	if token == "" {
+		var err error
+		token, err = GenerateToken()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate authentication token: %w", err)
+		}
+		log.Printf("Generated NATS authentication token: %s", token)
+	}
+
 	opts := &natsServer.Options{
 		Host:      config.Host,
 		Port:      config.Port,
 		JetStream: true,
 		StoreDir:  config.StoreDir,
+		
+		// Token-based authentication
+		Authorization: token,
+		
+		// Additional security settings
+		WriteDeadline: 10 * time.Second,
+		MaxPayload:     1 << 20, // 1MB
 	}
 
 	ns, err := natsServer.NewServer(opts)
@@ -49,6 +80,7 @@ func NewServer(config *Config) (*NATSServer, error) {
 	return &NATSServer{
 		server: ns,
 		opts:   opts,
+		token:  token,
 	}, nil
 }
 
@@ -60,10 +92,10 @@ func (ns *NATSServer) Start() error {
 		return fmt.Errorf("NATS server failed to start within timeout")
 	}
 
-	log.Printf("NATS server started on %s:%d with JetStream enabled", ns.opts.Host, ns.opts.Port)
+	log.Printf("NATS server started on %s:%d with JetStream enabled and token authentication", ns.opts.Host, ns.opts.Port)
 
 	url := fmt.Sprintf("nats://%s:%d", ns.opts.Host, ns.opts.Port)
-	conn, err := nats.Connect(url)
+	conn, err := nats.Connect(url, nats.Token(ns.token))
 	if err != nil {
 		return fmt.Errorf("failed to connect to NATS: %w", err)
 	}
@@ -114,4 +146,15 @@ func (ns *NATSServer) JetStream() nats.JetStreamContext {
 // URL returns the server URL
 func (ns *NATSServer) URL() string {
 	return fmt.Sprintf("nats://%s:%d", ns.opts.Host, ns.opts.Port)
+}
+
+// Token returns the authentication token
+func (ns *NATSServer) Token() string {
+	return ns.token
+}
+
+// CreateClientConnection creates a new authenticated connection for external clients
+func (ns *NATSServer) CreateClientConnection() (*nats.Conn, error) {
+	url := fmt.Sprintf("nats://%s:%d", ns.opts.Host, ns.opts.Port)
+	return nats.Connect(url, nats.Token(ns.token))
 }

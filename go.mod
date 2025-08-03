@@ -3,6 +3,7 @@ module soxdrawer
 go 1.24.4
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/a-h/templ v0.3.924
 	github.com/nats-io/nats-server/v2 v2.11.6
 	github.com/nats-io/nats.go v1.44.0

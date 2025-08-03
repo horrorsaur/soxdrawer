@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"soxdrawer/internal/config"
 	"soxdrawer/internal/http"
 	"soxdrawer/internal/nats"
 	"soxdrawer/internal/store"
@@ -18,10 +19,44 @@ import (
 var content embed.FS
 
 func main() {
-	natsServer, _ := nats.NewServer(nats.DefaultConfig())
+	// Load configuration
+	cfg, err := config.LoadConfig("")
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Generate token if not present
+	if cfg.NATS.Token == "" {
+		if err := cfg.GenerateToken(); err != nil {
+			log.Fatalf("Failed to generate NATS token: %v", err)
+		}
+
+		// Save the updated configuration
+		if err := config.SaveConfig(cfg, ""); err != nil {
+			log.Printf("Warning: Failed to save configuration with generated token: %v", err)
+		} else {
+			log.Println("Generated and saved new NATS authentication token")
+		}
+	}
+
+	// Create NATS configuration from loaded config
+	natsConfig := &nats.Config{
+		Host:     cfg.NATS.Host,
+		Port:     cfg.NATS.Port,
+		StoreDir: cfg.NATS.StoreDir,
+		Token:    cfg.NATS.Token,
+	}
+
+	natsServer, err := nats.NewServer(natsConfig)
+	if err != nil {
+		log.Fatalf("Failed to create NATS server: %v", err)
+	}
+
 	if err := natsServer.Start(); err != nil {
 		log.Fatalf("Failed to start NATS server: %v", err)
 	}
+
+	log.Printf("NATS server is secured with token authentication")
 
 	store, err := store.New(natsServer.JetStream())
 	if err != nil {
@@ -31,8 +66,10 @@ func main() {
 	status, _ := store.Status()
 	log.Printf("Object store status - Bucket: %s, Size: %d", status.Bucket(), status.Size())
 
-	httpCfg := http.DefaultConfig()
-	httpCfg.Assets = content
+	httpCfg := &http.Config{
+		Address: cfg.HTTP.Address,
+		Assets:  content,
+	}
 	httpServer := http.New(httpCfg, store)
 	if err := httpServer.Start(); err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
@@ -40,10 +77,12 @@ func main() {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
 	log.Println("soxdrawer is running. Press Ctrl+C to stop.")
+	log.Printf("HTTP server: http://localhost%s", cfg.HTTP.Address)
+	log.Printf("NATS server: %s (token required)", natsServer.URL())
 
 	<-sigChan
-
 	shutdown(natsServer, httpServer)
 }
 

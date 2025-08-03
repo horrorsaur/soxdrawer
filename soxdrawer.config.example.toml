@@ -1,0 +1,11 @@
+# SoxDrawer Configuration
+# This file contains sensitive authentication tokens - keep it secure!
+
+[nats]
+host = "127.0.0.1"
+port = 4222
+store_dir = "./jetstream"
+token = "your-secure-token-here"
+
+[http]
+address = ":8080"
