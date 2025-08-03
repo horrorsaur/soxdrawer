@@ -2,8 +2,10 @@ package http
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -11,17 +13,20 @@ import (
 	"time"
 
 	"soxdrawer/internal/store"
+	"soxdrawer/internal/templates"
 )
 
 type (
 	Server struct {
-		Address     string
-		ObjectStore *store.ObjectStore
-		server      *http.Server
+		Address        string
+		ObjectStore    *store.ObjectStore
+		server         *http.Server
+		embeddedAssets embed.FS
 	}
 
 	Config struct {
 		Address string
+		Assets  embed.FS
 	}
 
 	UploadResponse struct {
@@ -48,8 +53,9 @@ func DefaultConfig() *Config {
 // New creates a new HTTP server instance
 func New(config *Config, objectStore *store.ObjectStore) *Server {
 	return &Server{
-		Address:     config.Address,
-		ObjectStore: objectStore,
+		Address:        config.Address,
+		ObjectStore:    objectStore,
+		embeddedAssets: config.Assets,
 	}
 }
 
@@ -57,12 +63,19 @@ func New(config *Config, objectStore *store.ObjectStore) *Server {
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
+	httpAssets, err := fs.Sub(s.embeddedAssets, "web/dist")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(httpAssets))))
+
 	mux.HandleFunc("/", s.indexHandler)
-	mux.HandleFunc("/list", s.listHandler)
-	mux.HandleFunc("/upload", s.uploadHandler)
-	mux.HandleFunc("/delete/", s.deleteHandler)
-	mux.HandleFunc("/download/", s.downloadHandler)
-	mux.HandleFunc("/preview/", s.previewHandler)
+
+	mux.HandleFunc("/api/list", s.listHandler)
+	mux.HandleFunc("/api/upload", s.uploadHandler)
+	mux.HandleFunc("/api/delete/", s.deleteHandler)
+	mux.HandleFunc("/api/download/", s.downloadHandler)
 
 	s.server = &http.Server{
 		Addr:    s.Address,
@@ -92,20 +105,23 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // indexHandler handles the homepage
 func (s *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
-	s.sendJSONResponse(w, http.StatusOK, "server is up")
+	err := templates.ReactRoot().Render(r.Context(), w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // listHandler handles the list endpoint
 func (s *Server) listHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		s.sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	objects, err := s.ObjectStore.ListObjectsForAPI()
 	if err != nil {
 		log.Printf("Failed to list objects: %v", err)
-		s.sendErrorResponse(w, "Failed to list objects", http.StatusInternalServerError)
+		sendErrorResponse(w, "Failed to list objects", http.StatusInternalServerError)
 		return
 	}
 
@@ -115,45 +131,27 @@ func (s *Server) listHandler(w http.ResponseWriter, r *http.Request) {
 		Objects: objects,
 	}
 
-	s.sendJSONResponse(w, http.StatusOK, response)
+	sendJSONResponse(w, http.StatusOK, response)
 }
 
 // uploadHandler handles the file upload endpoint
 func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		s.sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	const maxMemory = 32 << 20
 	if err := r.ParseMultipartForm(maxMemory); err != nil {
 		log.Printf("Failed to parse multipart form: %v", err)
-		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> Failed to parse form data
-			</div>`
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(errorHTML))
-		} else {
-			s.sendErrorResponse(w, "Failed to parse form data", http.StatusBadRequest)
-		}
+		sendErrorResponse(w, "Failed to parse form data", http.StatusBadRequest)
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		log.Printf("Failed to get file from form: %v", err)
-		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> No file provided or invalid file
-			</div>`
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(errorHTML))
-		} else {
-			s.sendErrorResponse(w, "No file provided or invalid file", http.StatusBadRequest)
-		}
+		sendErrorResponse(w, "No file provided or invalid file", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -185,16 +183,7 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	info, err := s.ObjectStore.PutReader(key, file)
 	if err != nil {
 		log.Printf("Failed to store %s %s: %v", contentType, key, err)
-		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := fmt.Sprintf(`<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> Failed to store %s
-			</div>`, contentType)
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(errorHTML))
-		} else {
-			s.sendErrorResponse(w, "Failed to store file", http.StatusInternalServerError)
-		}
+		sendErrorResponse(w, "Failed to store file", http.StatusInternalServerError)
 		return
 	}
 
@@ -208,38 +197,20 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		Filename: filename,
 	}
 
-	s.sendJSONResponse(w, http.StatusOK, response)
+	sendJSONResponse(w, http.StatusOK, response)
 }
 
 // deleteHandler handles the delete endpoint
 func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> Method not allowed
-			</div>`
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			w.Write([]byte(errorHTML))
-		} else {
-			s.sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
+		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Extract the key from the URL path
 	path := strings.TrimPrefix(r.URL.Path, "/delete/")
 	if path == "" {
-		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> No key provided
-			</div>`
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(errorHTML))
-		} else {
-			s.sendErrorResponse(w, "No key provided", http.StatusBadRequest)
-		}
+		sendErrorResponse(w, "No key provided", http.StatusBadRequest)
 		return
 	}
 
@@ -249,38 +220,17 @@ func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	err := s.ObjectStore.Delete(key)
 	if err != nil {
 		log.Printf("Failed to delete object %s: %v", key, err)
-		if r.Header.Get("HX-Request") == "true" {
-			errorHTML := `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-				<strong>Error:</strong> Failed to delete object
-			</div>`
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(errorHTML))
-		} else {
-			s.sendErrorResponse(w, "Failed to delete object", http.StatusInternalServerError)
-		}
+		sendErrorResponse(w, "Failed to delete object", http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("Successfully deleted object: %s", key)
-
-	// Check if this is an HTMX request
-	if r.Header.Get("HX-Request") == "true" {
-		// Return HTML response for HTMX - redirect to list page
-		w.Header().Set("HX-Redirect", "/list")
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	// Return JSON response for regular requests
-	response := UploadResponse{
-		Status:  "success",
-		Message: "Object deleted successfully",
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(UploadResponse{
+		Status:  "success",
+		Message: "Object deleted successfully",
+	})
 }
 
 // downloadHandler handles the download endpoint
@@ -330,52 +280,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// previewHandler handles the preview endpoint
-func (s *Server) previewHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract the key from the URL path
-	path := strings.TrimPrefix(r.URL.Path, "/preview/")
-	if path == "" {
-		http.Error(w, "No key provided", http.StatusBadRequest)
-		return
-	}
-
-	key := strings.TrimSpace(path)
-	log.Printf("Previewing object: %s", key)
-
-	// Get the object from the store
-	data, err := s.ObjectStore.Get(key)
-	if err != nil {
-		log.Printf("Failed to get object %s: %v", key, err)
-		http.Error(w, "Object not found", http.StatusNotFound)
-		return
-	}
-
-	// Check if it's a text file (for preview)
-	if !strings.HasSuffix(key, ".txt") {
-		http.Error(w, "Preview only available for text files", http.StatusBadRequest)
-		return
-	}
-
-	// Set headers for text preview
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
-
-	// Write the data to the response
-	_, err = w.Write(data)
-	if err != nil {
-		log.Printf("Failed to write preview data: %v", err)
-		http.Error(w, "Failed to generate preview", http.StatusInternalServerError)
-		return
-	}
-}
-
-// sendErrorResponse sends a JSON error response
-func (s *Server) sendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
+func sendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
 	response := UploadResponse{
 		Status:  "error",
 		Message: message,
@@ -386,13 +291,12 @@ func (s *Server) sendErrorResponse(w http.ResponseWriter, message string, status
 	json.NewEncoder(w).Encode(response)
 }
 
-func (s *Server) sendJSONResponse(w http.ResponseWriter, statusCode int, payload any) {
+func sendJSONResponse(w http.ResponseWriter, statusCode int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(payload)
 }
 
-// sanitizeFilename removes potentially dangerous characters from filenames
 func sanitizeFilename(filename string) string {
 	base := filepath.Base(filename)
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"log"
 	"os"
 	"os/signal"
@@ -12,6 +13,9 @@ import (
 	"soxdrawer/internal/nats"
 	"soxdrawer/internal/store"
 )
+
+//go:embed web/dist/*
+var content embed.FS
 
 func main() {
 	natsServer, _ := nats.NewServer(nats.DefaultConfig())
@@ -27,7 +31,9 @@ func main() {
 	status, _ := store.Status()
 	log.Printf("Object store status - Bucket: %s, Size: %d", status.Bucket(), status.Size())
 
-	httpServer := http.New(http.DefaultConfig(), store)
+	httpCfg := http.DefaultConfig()
+	httpCfg.Assets = content
+	httpServer := http.New(httpCfg, store)
 	if err := httpServer.Start(); err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
