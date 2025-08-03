@@ -13,11 +13,24 @@
       in
       {
         devShells.default = pkgs.mkShell {
+
           buildInputs = with pkgs; [
-            go
-            bun
-            templ
+            go gopls templ
+            nodejs
           ];
+
+          shellHook = ''
+            build-sd() {
+              echo "Building frontend..."
+              cd web/ && npm run build && cd ..
+
+              echo "Building index template..."
+              templ generate internal/templates
+
+              echo "Building Golang binary..."
+              go build -v -o bin/sd .
+            }
+          '';
         };
       }
     );

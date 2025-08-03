@@ -35,5 +35,9 @@ jetstream/
 # Generated templ files
 *_templ.go
 
+# React Frontend
 web/node_modules
 web/dist
+
+# Test binaries
+bin/
