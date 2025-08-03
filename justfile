@@ -1,15 +1,18 @@
 watch:
 	@templ generate --watch --cmd="go run ."
 
-generate:
+generate: build-react-frontend
 	@templ generate internal/templates/
+
+build-react-frontend:
+	cd web && npm run build
 
 # Build the main binary
 build-sd: generate
 	@go build .
 
 build-windows: generate
-	GOOS=windows go build .
+	GOOS=windows go build -o bin/soxdrawer.exe .
 
 clean:
 	rm -f soxdrawer
