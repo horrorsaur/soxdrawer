@@ -14,6 +14,8 @@ import (
 
 	"soxdrawer/internal/store"
 	"soxdrawer/internal/templates"
+
+	"github.com/a-h/templ"
 )
 
 type (
@@ -113,7 +115,6 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	if s.server == nil {
 		return nil
@@ -123,15 +124,10 @@ func (s *Server) Stop(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-// indexHandler handles the homepage
 func (s *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
-	err := templates.ReactRoot().Render(r.Context(), w)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	sendTemplateResponse(r.Context(), w, templates.ReactRoot(), 200)
 }
 
-// listHandler handles the list endpoint
 func (s *Server) listHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -145,16 +141,13 @@ func (s *Server) listHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := ListResponse{
+	sendJSONResponse(w, http.StatusOK, ListResponse{
 		Status:  "success",
 		Message: "",
 		Objects: objects,
-	}
-
-	sendJSONResponse(w, http.StatusOK, response)
+	})
 }
 
-// uploadHandler handles the file upload endpoint
 func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -209,15 +202,13 @@ func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Successfully uploaded %s %s (size: %d bytes)", contentType, key, info.Size)
 
-	response := UploadResponse{
+	sendJSONResponse(w, http.StatusOK, UploadResponse{
 		Status:   "success",
 		Message:  "Content uploaded successfully",
 		Key:      key,
 		Size:     int64(info.Size),
 		Filename: filename,
-	}
-
-	sendJSONResponse(w, http.StatusOK, response)
+	})
 }
 
 // deleteHandler handles the delete endpoint
@@ -317,79 +308,7 @@ func (s *Server) loginPageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Serve login page
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	loginHTML := `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoxDrawer - Login</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full space-y-8">
-        <div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                SoxDrawer Login
-            </h2>
-            <p class="mt-2 text-center text-sm text-gray-600">
-                Enter your authentication token to continue
-            </p>
-        </div>
-        <form class="mt-8 space-y-6" id="loginForm">
-            <div>
-                <label for="token" class="sr-only">Authentication Token</label>
-                <input id="token" name="token" type="password" required 
-                       class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
-                       placeholder="Enter your authentication token">
-            </div>
-            <div>
-                <button type="submit" 
-                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Sign in
-                </button>
-            </div>
-            <div id="error" class="hidden text-red-600 text-sm text-center"></div>
-        </form>
-    </div>
-
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const token = document.getElementById('token').value;
-            const errorDiv = document.getElementById('error');
-            
-            try {
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ token: token })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    errorDiv.textContent = result.message || 'Authentication failed';
-                    errorDiv.classList.remove('hidden');
-                }
-            } catch (error) {
-                errorDiv.textContent = 'Network error. Please try again.';
-                errorDiv.classList.remove('hidden');
-            }
-        });
-    </script>
-</body>
-</html>`
-
-	w.Write([]byte(loginHTML))
+	sendTemplateResponse(r.Context(), w, templates.LoginPage(), 200)
 }
 
 // loginHandler handles authentication
@@ -420,12 +339,10 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	sessionToken := createSessionToken(s.authToken)
 	setSessionCookie(w, sessionToken)
 
-	response := LoginResponse{
+	sendJSONResponse(w, http.StatusOK, LoginResponse{
 		Status:  "success",
 		Message: "Authentication successful",
-	}
-
-	sendJSONResponse(w, http.StatusOK, response)
+	})
 }
 
 // logoutHandler handles logout
@@ -437,12 +354,20 @@ func (s *Server) logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	clearSessionCookie(w)
 
-	response := LoginResponse{
+	sendJSONResponse(w, http.StatusOK, LoginResponse{
 		Status:  "success",
 		Message: "Logged out successfully",
-	}
+	})
+}
 
-	sendJSONResponse(w, http.StatusOK, response)
+func sendTemplateResponse(ctx context.Context, w http.ResponseWriter, template templ.Component, statusCode int) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(statusCode)
+
+	err := template.Render(ctx, w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func sendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
