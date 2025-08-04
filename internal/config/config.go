@@ -35,8 +35,9 @@ type (
 
 	// AuthConfig holds authentication configuration
 	AuthConfig struct {
-		Enabled              bool `toml:"enabled"`
-		RequireAuthentication bool `toml:"require_authentication"`
+		Enabled               bool   `toml:"enabled"`
+		RequireAuthentication bool   `toml:"require_authentication"`
+		SessionSecret         string `toml:"session_secret"`
 	}
 )
 
@@ -61,6 +62,7 @@ func DefaultConfig() *Config {
 		Auth: AuthConfig{
 			Enabled:              true,
 			RequireAuthentication: true,
+			SessionSecret:        "", // Will be generated if empty
 		},
 		Users: make(map[string]*auth.User),
 	}

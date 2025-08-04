@@ -19,10 +19,23 @@ import (
 var content embed.FS
 
 func main() {
-	// Load configuration
-	cfg, err := config.LoadConfig("")
+	// Load config
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Generate session secret if not set
+	if cfg.Auth.SessionSecret == "" {
+		log.Println("Session secret not set, generating a new one")
+		secret, err := auth.GenerateRandomString(32)
+		if err != nil {
+			log.Fatalf("Failed to generate session secret: %v", err)
+		}
+		cfg.Auth.SessionSecret = secret
+		if err := config.SaveConfig(cfg, *configPath); err != nil {
+			log.Fatalf("Failed to save config with new session secret: %v", err)
+		}
 	}
 
 	// Generate token if not present

@@ -68,14 +68,61 @@ func DefaultConfig() *Config {
 }
 
 // New creates a new HTTP server instance
-func New(config *Config, objectStore *store.ObjectStore, authManager *auth.AuthManager) *Server {
-	return &Server{
-		Address:        config.Address,
-		ObjectStore:    objectStore,
-		AuthManager:    authManager,
-		embeddedAssets: config.Assets,
-		authEnabled:    config.AuthEnabled,
+func New(cfg *config.Config, store *store.ObjectStore, js nats.JetStreamContext) (*Server, error) {
+	authenticator := auth.NewAuthenticator(cfg.Auth.SessionSecret, cfg.Users)
+
+	srv := &Server{
+		Config: cfg,
+		Store:  store,
+		JS:     js,
+		Auth:   authenticator,
 	}
+
+	// Create a new router
+	r := http.NewServeMux()
+
+	// Register handlers
+	r.HandleFunc("POST /api/login", srv.LoginHandler)
+	r.HandleFunc("POST /api/logout", srv.LogoutHandler)
+	r.Handle("/api/objects", srv.AuthMiddleware(http.HandlerFunc(srv.listObjects)))
+	r.Handle("/api/objects/upload", srv.AuthMiddleware(http.HandlerFunc(srv.uploadObject)))
+	r.Handle("/api/objects/", srv.AuthMiddleware(http.HandlerFunc(srv.getObject)))
+
+	// Serve static files from the web/dist directory
+	fs := http.FileServer(http.Dir("web/dist"))
+	r.Handle("/", fs)
+
+	srv.Router = r
+	return srv, nil
+}
+
+// LoginHandler handles user login
+func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	user, err := s.Auth.Login(w, r, username, password)
+	if err != nil {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
+
+	json.NewEncoder(w).Encode(user)
+}
+
+// LogoutHandler handles user logout
+func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if err := s.Auth.Logout(w, r); err != nil {
+		http.Error(w, "Failed to logout", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // Start starts the HTTP server with routes

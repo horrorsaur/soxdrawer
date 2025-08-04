@@ -4,250 +4,108 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"sync"
-	"time"
+	"net/http"
 
+	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type (
-	// User represents a user in the system
+	// User represents a user account
 	User struct {
-		Username     string    `toml:"username"`
-		PasswordHash string    `toml:"password_hash"`
-		CreatedAt    time.Time `toml:"created_at"`
-		LastLogin    time.Time `toml:"last_login"`
-	}
-
-	// Session represents an active user session
-	Session struct {
-		ID        string
-		Username  string
-		CreatedAt time.Time
-		ExpiresAt time.Time
-	}
-
-	// AuthManager handles authentication and session management
-	AuthManager struct {
-		users    map[string]*User
-		sessions map[string]*Session
-		mutex    sync.RWMutex
+		Username     string `json:"username" toml:"username"`
+		PasswordHash string `json:"-" toml:"password_hash"`
+		IsAdmin      bool   `json:"is_admin" toml:"is_admin"`
 	}
 )
 
 const (
-	// SessionDuration defines how long sessions are valid
-	SessionDuration = 24 * time.Hour
-	// MinPasswordLength defines minimum password length
-	MinPasswordLength = 8
-	// SessionIDLength defines the length of session IDs
-	SessionIDLength = 32
+	// SessionName is the name of the session cookie
+	SessionName = "soxdrawer_session"
+	// UserIDKey is the key for the user ID in the session
+	UserIDKey = "user_id"
 )
 
-// NewAuthManager creates a new authentication manager
-func NewAuthManager() *AuthManager {
-	return &AuthManager{
-		users:    make(map[string]*User),
-		sessions: make(map[string]*Session),
+// Authenticator handles user authentication and session management
+type Authenticator struct {
+	Store sessions.Store
+	Users map[string]*User
+}
+
+// NewAuthenticator creates a new Authenticator
+func NewAuthenticator(sessionSecret string, users map[string]*User) *Authenticator {
+	store := sessions.NewCookieStore([]byte(sessionSecret))
+	return &Authenticator{
+		Store: store,
+		Users: users,
 	}
 }
 
-// CreateUser creates a new user with the given username and password
-func (am *AuthManager) CreateUser(username, password string) error {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
-
-	// Validate username
-	if username == "" {
-		return fmt.Errorf("username cannot be empty")
-	}
-
-	// Check if user already exists
-	if _, exists := am.users[username]; exists {
-		return fmt.Errorf("user %s already exists", username)
-	}
-
-	// Validate password
-	if len(password) < MinPasswordLength {
-		return fmt.Errorf("password must be at least %d characters long", MinPasswordLength)
-	}
-
-	// Hash password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+// SetPassword sets the user's password hash
+func (u *User) SetPassword(password string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
-
-	// Create user
-	user := &User{
-		Username:     username,
-		PasswordHash: string(passwordHash),
-		CreatedAt:    time.Now(),
-	}
-
-	am.users[username] = user
+	u.PasswordHash = string(hash)
 	return nil
 }
 
-// Authenticate validates username/password and returns a session ID if successful
-func (am *AuthManager) Authenticate(username, password string) (string, error) {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
+// CheckPassword checks if the provided password is correct
+func (u *User) CheckPassword(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	return err == nil
+}
 
-	// Find user
-	user, exists := am.users[username]
-	if !exists {
-		return "", fmt.Errorf("invalid username or password")
+// Login handles user login
+func (a *Authenticator) Login(w http.ResponseWriter, r *http.Request, username, password string) (*User, error) {
+	user, ok := a.Users[username]
+	if !ok || !user.CheckPassword(password) {
+		return nil, fmt.Errorf("invalid username or password")
 	}
 
-	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", fmt.Errorf("invalid username or password")
+	session, _ := a.Store.Get(r, SessionName)
+	session.Values[UserIDKey] = user.Username
+	if err := session.Save(r, w); err != nil {
+		return nil, fmt.Errorf("failed to save session: %w", err)
 	}
 
-	// Update last login
-	user.LastLogin = time.Now()
+	return user, nil
+}
 
-	// Generate session ID
-	sessionID, err := generateSessionID()
+// Logout handles user logout
+func (a *Authenticator) Logout(w http.ResponseWriter, r *http.Request) error {
+	session, _ := a.Store.Get(r, SessionName)
+	session.Options.MaxAge = -1
+	if err := session.Save(r, w); err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+	return nil
+}
+
+// GetCurrentUser returns the currently logged-in user
+func (a *Authenticator) GetCurrentUser(r *http.Request) (*User, error) {
+	session, err := a.Store.Get(r, SessionName)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate session ID: %w", err)
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	// Create session
-	session := &Session{
-		ID:        sessionID,
-		Username:  username,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(SessionDuration),
+	userID, ok := session.Values[UserIDKey].(string)
+	if !ok {
+		return nil, nil // No user logged in
 	}
 
-	am.sessions[sessionID] = session
-	return sessionID, nil
+	user, ok := a.Users[userID]
+	if !ok {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return user, nil
 }
 
-// ValidateSession checks if a session ID is valid and returns the username
-func (am *AuthManager) ValidateSession(sessionID string) (string, error) {
-	am.mutex.RLock()
-	defer am.mutex.RUnlock()
-
-	session, exists := am.sessions[sessionID]
-	if !exists {
-		return "", fmt.Errorf("invalid session")
-	}
-
-	// Check if session has expired
-	if time.Now().After(session.ExpiresAt) {
-		// Clean up expired session
-		go am.removeExpiredSession(sessionID)
-		return "", fmt.Errorf("session expired")
-	}
-
-	return session.Username, nil
-}
-
-// RevokeSession removes a session
-func (am *AuthManager) RevokeSession(sessionID string) error {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
-
-	if _, exists := am.sessions[sessionID]; !exists {
-		return fmt.Errorf("session not found")
-	}
-
-	delete(am.sessions, sessionID)
-	return nil
-}
-
-// ChangePassword changes a user's password
-func (am *AuthManager) ChangePassword(username, oldPassword, newPassword string) error {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
-
-	user, exists := am.users[username]
-	if !exists {
-		return fmt.Errorf("user not found")
-	}
-
-	// Verify old password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
-		return fmt.Errorf("invalid current password")
-	}
-
-	// Validate new password
-	if len(newPassword) < MinPasswordLength {
-		return fmt.Errorf("password must be at least %d characters long", MinPasswordLength)
-	}
-
-	// Hash new password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-
-	user.PasswordHash = string(passwordHash)
-	return nil
-}
-
-// ListUsers returns a list of usernames (for admin purposes)
-func (am *AuthManager) ListUsers() []string {
-	am.mutex.RLock()
-	defer am.mutex.RUnlock()
-
-	usernames := make([]string, 0, len(am.users))
-	for username := range am.users {
-		usernames = append(usernames, username)
-	}
-	return usernames
-}
-
-// GetUsers returns a copy of all users (without password hashes)
-func (am *AuthManager) GetUsers() map[string]*User {
-	am.mutex.RLock()
-	defer am.mutex.RUnlock()
-
-	users := make(map[string]*User)
-	for username, user := range am.users {
-		users[username] = &User{
-			Username:  user.Username,
-			CreatedAt: user.CreatedAt,
-			LastLogin: user.LastLogin,
-			// Intentionally omit PasswordHash
-		}
-	}
-	return users
-}
-
-// SetUsers sets the users map (used for loading from config)
-func (am *AuthManager) SetUsers(users map[string]*User) {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
-	am.users = users
-}
-
-// removeExpiredSession removes an expired session (called asynchronously)
-func (am *AuthManager) removeExpiredSession(sessionID string) {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
-	delete(am.sessions, sessionID)
-}
-
-// CleanupExpiredSessions removes all expired sessions
-func (am *AuthManager) CleanupExpiredSessions() {
-	am.mutex.Lock()
-	defer am.mutex.Unlock()
-
-	now := time.Now()
-	for sessionID, session := range am.sessions {
-		if now.After(session.ExpiresAt) {
-			delete(am.sessions, sessionID)
-		}
-	}
-}
-
-// generateSessionID creates a secure random session ID
-func generateSessionID() (string, error) {
-	bytes := make([]byte, SessionIDLength)
+// GenerateRandomString generates a random string of the specified length
+func GenerateRandomString(length int) (string, error) {
+	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
