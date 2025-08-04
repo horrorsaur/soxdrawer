@@ -1,5 +1,5 @@
 {
-  description = "A simple Go project with a bun-based frontend";
+  description = "";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

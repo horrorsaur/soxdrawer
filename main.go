@@ -94,7 +94,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	log.Println("soxdrawer is running. Press Ctrl+C to stop.")
-	log.Printf("HTTP server: http://localhost%s", cfg.HTTP.Address)
+	log.Printf("HTTP server: http://%s", cfg.HTTP.Address)
 	log.Printf("NATS server: %s (token required)", natsServer.URL())
 	log.Printf("HTTP authentication token: %s", cfg.HTTP.Auth.Token)
 
