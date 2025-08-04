@@ -8,13 +8,16 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"soxdrawer/internal/auth"
 )
 
 type (
 	// Config holds the application configuration
 	Config struct {
-		NATS NATSConfig `toml:"nats"`
-		HTTP HTTPConfig `toml:"http"`
+		NATS NATSConfig           `toml:"nats"`
+		HTTP HTTPConfig           `toml:"http"`
+		Auth AuthConfig           `toml:"auth"`
+		Users map[string]*auth.User `toml:"users"`
 	}
 
 	// NATSConfig holds NATS server configuration
@@ -28,6 +31,12 @@ type (
 	// HTTPConfig holds HTTP server configuration
 	HTTPConfig struct {
 		Address string `toml:"address"`
+	}
+
+	// AuthConfig holds authentication configuration
+	AuthConfig struct {
+		Enabled              bool `toml:"enabled"`
+		RequireAuthentication bool `toml:"require_authentication"`
 	}
 )
 
@@ -49,6 +58,11 @@ func DefaultConfig() *Config {
 		HTTP: HTTPConfig{
 			Address: ":8080",
 		},
+		Auth: AuthConfig{
+			Enabled:              true,
+			RequireAuthentication: true,
+		},
+		Users: make(map[string]*auth.User),
 	}
 }
 
@@ -72,6 +86,11 @@ func LoadConfig(configPath string) (*Config, error) {
 	var config Config
 	if _, err := toml.DecodeFile(configPath, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Ensure Users map is initialized
+	if config.Users == nil {
+		config.Users = make(map[string]*auth.User)
 	}
 
 	return &config, nil
@@ -102,7 +121,7 @@ func SaveConfig(config *Config, configPath string) error {
 	if _, err := file.WriteString("# SoxDrawer Configuration\n"); err != nil {
 		return fmt.Errorf("failed to write config header: %w", err)
 	}
-	if _, err := file.WriteString("# This file contains sensitive authentication tokens - keep it secure!\n\n"); err != nil {
+	if _, err := file.WriteString("# This file contains sensitive authentication tokens and password hashes - keep it secure!\n\n"); err != nil {
 		return fmt.Errorf("failed to write config header: %w", err)
 	}
 

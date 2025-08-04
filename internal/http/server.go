@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"soxdrawer/internal/auth"
 	"soxdrawer/internal/store"
 	"soxdrawer/internal/templates"
 )
@@ -20,13 +21,28 @@ type (
 	Server struct {
 		Address        string
 		ObjectStore    *store.ObjectStore
+		AuthManager    *auth.AuthManager
 		server         *http.Server
 		embeddedAssets embed.FS
+		authEnabled    bool
 	}
 
 	Config struct {
-		Address string
-		Assets  embed.FS
+		Address     string
+		Assets      embed.FS
+		AuthEnabled bool
+	}
+
+	// Request/Response types
+	LoginRequest struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	LoginResponse struct {
+		Status    string `json:"status"`
+		Message   string `json:"message"`
+		SessionID string `json:"session_id,omitempty"`
 	}
 
 	UploadResponse struct {
@@ -46,16 +62,19 @@ type (
 
 func DefaultConfig() *Config {
 	return &Config{
-		Address: ":8080",
+		Address:     ":8080",
+		AuthEnabled: true,
 	}
 }
 
 // New creates a new HTTP server instance
-func New(config *Config, objectStore *store.ObjectStore) *Server {
+func New(config *Config, objectStore *store.ObjectStore, authManager *auth.AuthManager) *Server {
 	return &Server{
 		Address:        config.Address,
 		ObjectStore:    objectStore,
+		AuthManager:    authManager,
 		embeddedAssets: config.Assets,
+		authEnabled:    config.AuthEnabled,
 	}
 }
 
@@ -70,19 +89,30 @@ func (s *Server) Start() error {
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(httpAssets))))
 
+	// Public routes
 	mux.HandleFunc("/", s.indexHandler)
+	mux.HandleFunc("/api/login", s.loginHandler)
+	mux.HandleFunc("/api/logout", s.logoutHandler)
 
-	mux.HandleFunc("/api/list", s.listHandler)
-	mux.HandleFunc("/api/upload", s.uploadHandler)
-	mux.HandleFunc("/api/delete/", s.deleteHandler)
-	mux.HandleFunc("/api/download/", s.downloadHandler)
+	// Protected routes
+	if s.authEnabled {
+		mux.HandleFunc("/api/list", s.authMiddleware(s.listHandler))
+		mux.HandleFunc("/api/upload", s.authMiddleware(s.uploadHandler))
+		mux.HandleFunc("/api/delete/", s.authMiddleware(s.deleteHandler))
+		mux.HandleFunc("/api/download/", s.authMiddleware(s.downloadHandler))
+	} else {
+		mux.HandleFunc("/api/list", s.listHandler)
+		mux.HandleFunc("/api/upload", s.uploadHandler)
+		mux.HandleFunc("/api/delete/", s.deleteHandler)
+		mux.HandleFunc("/api/download/", s.downloadHandler)
+	}
 
 	s.server = &http.Server{
 		Addr:    s.Address,
 		Handler: corsMiddleware(mux),
 	}
 
-	log.Printf("Starting HTTP server on %s", s.Address)
+	log.Printf("Starting HTTP server on %s (auth: %v)", s.Address, s.authEnabled)
 
 	go func() {
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -101,6 +131,110 @@ func (s *Server) Stop(ctx context.Context) error {
 
 	log.Println("Shutting down HTTP server...")
 	return s.server.Shutdown(ctx)
+}
+
+// authMiddleware checks for valid authentication
+func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.authEnabled {
+			next(w, r)
+			return
+		}
+
+		// Get session ID from cookie
+		cookie, err := r.Cookie("session_id")
+		if err != nil {
+			sendErrorResponse(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate session
+		username, err := s.AuthManager.ValidateSession(cookie.Value)
+		if err != nil {
+			sendErrorResponse(w, "Invalid or expired session", http.StatusUnauthorized)
+			return
+		}
+
+		// Add username to request context for logging
+		log.Printf("Authenticated request from user: %s to %s", username, r.URL.Path)
+		next(w, r)
+	}
+}
+
+// loginHandler handles user authentication
+func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var loginReq LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
+		sendErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Authenticate user
+	sessionID, err := s.AuthManager.Authenticate(loginReq.Username, loginReq.Password)
+	if err != nil {
+		log.Printf("Failed login attempt for user: %s", loginReq.Username)
+		sendErrorResponse(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Set session cookie
+	cookie := &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(auth.SessionDuration),
+	}
+	http.SetCookie(w, cookie)
+
+	log.Printf("Successful login for user: %s", loginReq.Username)
+
+	response := LoginResponse{
+		Status:    "success",
+		Message:   "Login successful",
+		SessionID: sessionID,
+	}
+
+	sendJSONResponse(w, http.StatusOK, response)
+}
+
+// logoutHandler handles user logout
+func (s *Server) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get session ID from cookie
+	cookie, err := r.Cookie("session_id")
+	if err == nil {
+		// Revoke session
+		s.AuthManager.RevokeSession(cookie.Value)
+	}
+
+	// Clear session cookie
+	cookie = &http.Cookie{
+		Name:     "session_id",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  time.Unix(0, 0),
+	}
+	http.SetCookie(w, cookie)
+
+	response := LoginResponse{
+		Status:  "success",
+		Message: "Logout successful",
+	}
+
+	sendJSONResponse(w, http.StatusOK, response)
 }
 
 // indexHandler handles the homepage
@@ -208,7 +342,7 @@ func (s *Server) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract the key from the URL path
-	path := strings.TrimPrefix(r.URL.Path, "/delete/")
+	path := strings.TrimPrefix(r.URL.Path, "/api/delete/")
 	if path == "" {
 		sendErrorResponse(w, "No key provided", http.StatusBadRequest)
 		return
@@ -241,7 +375,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract the key from the URL path
-	path := strings.TrimPrefix(r.URL.Path, "/download/")
+	path := strings.TrimPrefix(r.URL.Path, "/api/download/")
 	if path == "" {
 		http.Error(w, "No key provided", http.StatusBadRequest)
 		return
