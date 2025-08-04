@@ -27,7 +27,14 @@ type (
 
 	// HTTPConfig holds HTTP server configuration
 	HTTPConfig struct {
-		Address string `toml:"address"`
+		Address string     `toml:"address"`
+		Auth    AuthConfig `toml:"auth"`
+	}
+
+	// AuthConfig holds authentication configuration
+	AuthConfig struct {
+		Token           string `toml:"token"`
+		SessionDuration int    `toml:"session_duration_hours"` // Duration in hours
 	}
 )
 
@@ -48,6 +55,10 @@ func DefaultConfig() *Config {
 		},
 		HTTP: HTTPConfig{
 			Address: ":8080",
+			Auth: AuthConfig{
+				Token:           "", // Will be generated if empty
+				SessionDuration: 12, // 12 hours default
+			},
 		},
 	}
 }
@@ -121,8 +132,19 @@ func (c *Config) GenerateToken() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate token: %w", err)
 	}
-	
+
 	c.NATS.Token = token
+	return nil
+}
+
+// GenerateHTTPToken creates a new HTTP authentication token and updates the config
+func (c *Config) GenerateHTTPToken() error {
+	token, err := generateSecureToken()
+	if err != nil {
+		return fmt.Errorf("failed to generate HTTP token: %w", err)
+	}
+
+	c.HTTP.Auth.Token = token
 	return nil
 }
 

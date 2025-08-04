@@ -11,7 +11,8 @@ import {
   ExternalLink,
   Download,
   Clock,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useApi } from './hooks/useApi'
@@ -38,6 +39,25 @@ function App() {
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type })
     setTimeout(() => setNotification(null), 3000)
+  }
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        window.location.href = '/login'
+      } else {
+        showNotification('Failed to logout', 'error')
+      }
+    } catch (error) {
+      showNotification('Network error during logout', 'error')
+    }
   }
 
   const handleDrop = async (acceptedFiles: File[]) => {
@@ -160,6 +180,14 @@ function App() {
               <div className="text-sm text-gray-500">
                 {items.length} item{items.length !== 1 ? 's' : ''} stored
               </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
         </div>
