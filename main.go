@@ -39,6 +39,20 @@ func main() {
 		}
 	}
 
+	// Generate HTTP authentication token if not present
+	if cfg.HTTP.Auth.Token == "" {
+		if err := cfg.GenerateHTTPToken(); err != nil {
+			log.Fatalf("Failed to generate HTTP authentication token: %v", err)
+		}
+
+		// Save the updated configuration
+		if err := config.SaveConfig(cfg, ""); err != nil {
+			log.Printf("Warning: Failed to save configuration with generated HTTP token: %v", err)
+		} else {
+			log.Println("Generated and saved new HTTP authentication token")
+		}
+	}
+
 	// Create NATS configuration from loaded config
 	natsConfig := &nats.Config{
 		Host:     cfg.NATS.Host,
@@ -67,8 +81,9 @@ func main() {
 	log.Printf("Object store status - Bucket: %s, Size: %d", status.Bucket(), status.Size())
 
 	httpCfg := &http.Config{
-		Address: cfg.HTTP.Address,
-		Assets:  content,
+		Address:   cfg.HTTP.Address,
+		Assets:    content,
+		AuthToken: cfg.HTTP.Auth.Token,
 	}
 	httpServer := http.New(httpCfg, store)
 	if err := httpServer.Start(); err != nil {
@@ -81,6 +96,7 @@ func main() {
 	log.Println("soxdrawer is running. Press Ctrl+C to stop.")
 	log.Printf("HTTP server: http://localhost%s", cfg.HTTP.Address)
 	log.Printf("NATS server: %s (token required)", natsServer.URL())
+	log.Printf("HTTP authentication token: %s", cfg.HTTP.Auth.Token)
 
 	<-sigChan
 	shutdown(natsServer, httpServer)

@@ -9,3 +9,7 @@ token = "your-secure-token-here"
 
 [http]
 address = ":8080"
+
+[http.auth]
+token = "your-http-authentication-token-here"
+session_duration_hours = 12

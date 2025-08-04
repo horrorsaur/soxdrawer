@@ -46,6 +46,13 @@ class ApiService {
     })
 
     if (!response.ok) {
+      // Handle authentication errors
+      if (response.status === 401) {
+        // Redirect to login page
+        window.location.href = '/login'
+        throw new Error('Authentication required')
+      }
+      
       const errorData: ApiError = await response.json().catch(() => ({
         status: 'error',
         message: `HTTP ${response.status}: ${response.statusText}`,
@@ -68,6 +75,12 @@ class ApiService {
     })
 
     if (!response.ok) {
+      // Handle authentication errors
+      if (response.status === 401) {
+        window.location.href = '/login'
+        throw new Error('Authentication required')
+      }
+      
       const errorData: ApiError = await response.json().catch(() => ({
         status: 'error',
         message: `HTTP ${response.status}: ${response.statusText}`,
@@ -123,6 +136,10 @@ class ApiService {
     const response = await fetch(`${this.baseUrl}/download/${key}`)
     
     if (!response.ok) {
+      if (response.status === 401) {
+        window.location.href = '/login'
+        throw new Error('Authentication required')
+      }
       throw new Error(`Failed to download object: ${response.statusText}`)
     }
 
@@ -134,6 +151,10 @@ class ApiService {
     const response = await fetch(`${this.baseUrl}/preview/${key}`)
     
     if (!response.ok) {
+      if (response.status === 401) {
+        window.location.href = '/login'
+        throw new Error('Authentication required')
+      }
       throw new Error(`Failed to get object content: ${response.statusText}`)
     }
 
