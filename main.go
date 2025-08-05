@@ -98,6 +98,10 @@ func main() {
 	log.Printf("NATS server: %s (token required)", natsServer.URL())
 	log.Printf("HTTP authentication token: %s", cfg.HTTP.Auth.Token)
 
+	// if err := utils.OpenDefault("http://localhost:8080/"); err != nil {
+	// 	log.Panic(err)
+	// }
+
 	<-sigChan
 	shutdown(natsServer, httpServer)
 }
