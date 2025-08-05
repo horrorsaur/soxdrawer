@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+
+  "name": "soxdrawer",
+  "version": "0.1",
+  "description": "A NATS-powered object storage service extension",
+
+  "permissions": ["storage", "notifications"],
+
+  "host_permissions": ["*://localhost:8080/*", "*://127.0.0.1:8080/*"],
+
+  "sidebar_action": {
+    "default_title": "soxdrawer - local object storage",
+    "default_panel": "dist/index.html",
+    "open_at_install": false
+  },
+
+  "icons": {
+    "48": "public/sd-logo-48.png"
+  }
+}

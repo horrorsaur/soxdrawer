@@ -42,3 +42,4 @@ web/dist
 # Test binaries
 bin/
 soxdrawer.config.toml
+.aider*
