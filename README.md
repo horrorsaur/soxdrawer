@@ -9,6 +9,36 @@ A secure, token-based object store with drag & drop interface.
 - **Multiple Content Types**: Support for files, text, and URLs
 - **NATS JetStream Backend**: Reliable message streaming and object storage
 - **Session Management**: Secure session cookies with configurable duration
+- **Firefox Extension**: Browser extension for easy content saving from any webpage
+
+## Firefox Extension
+
+SoxDrawer includes a Firefox extension that allows you to save content directly from any webpage to your SoxDrawer storage.
+
+### Features
+
+- **Floating Button**: Quick access button on every webpage
+- **Drag & Drop**: Drop files, text, or links from any webpage
+- **Popup Interface**: Clean interface to view and manage stored items
+- **File Upload**: Upload files directly from the extension
+- **Item Management**: Download and delete stored items
+
+### Installation
+
+1. Navigate to the `firefox-extension` directory
+2. Run the build script: `./build.sh`
+3. Open Firefox and go to `about:addons`
+4. Click the gear icon and select "Install Add-on From File..."
+5. Select the generated `soxdrawer-extension.zip` file
+
+### Usage
+
+- Click the SoxDrawer icon in the Firefox toolbar to open the popup
+- Use the floating button (📁) on any webpage for quick access
+- Drag and drop content from web pages to automatically save to SoxDrawer
+- View, download, and delete stored items through the popup interface
+
+For detailed documentation, see [firefox-extension/README.md](firefox-extension/README.md).
 
 ## Authentication
 

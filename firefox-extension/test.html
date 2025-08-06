@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoxDrawer Extension Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-item {
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .test-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .test-item.draggable {
+            cursor: grab;
+        }
+        .test-item.draggable:active {
+            cursor: grabbing;
+        }
+        .highlight {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+        h1 {
+            color: #1e293b;
+            text-align: center;
+        }
+        h2 {
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 8px;
+        }
+        .instructions {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 SoxDrawer Extension Test Page</h1>
+    
+    <div class="instructions">
+        <h3>📋 Test Instructions</h3>
+        <p>This page is designed to test the SoxDrawer Firefox extension. Make sure the extension is installed and enabled.</p>
+        <ul>
+            <li>Look for the floating blue folder icon (📁) in the top-right corner</li>
+            <li>Try dragging the test items below to anywhere on the page</li>
+            <li>Click the floating button to open the SoxDrawer popup</li>
+            <li>Check that content is uploaded to your SoxDrawer storage</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>📄 Text Content</h2>
+        <p>Try dragging these text items:</p>
+        
+        <div class="test-item draggable" draggable="true" data-type="text">
+            <strong>Sample Text:</strong> This is a sample text that you can drag to test the extension.
+        </div>
+        
+        <div class="test-item draggable" draggable="true" data-type="text">
+            <strong>Code Snippet:</strong> 
+            <code>function hello() { console.log("Hello, SoxDrawer!"); }</code>
+        </div>
+        
+        <div class="test-item draggable" draggable="true" data-type="text">
+            <strong>URL:</strong> https://github.com/your-repo/soxdrawer
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🖼️ Image Content</h2>
+        <p>Try dragging these images:</p>
+        
+        <div class="test-item draggable" draggable="true" data-type="image">
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjM2I4MmY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRlc3Q8L3RleHQ+Cjwvc3ZnPgo=" alt="Test Image" style="width: 100px; height: 100px; border-radius: 4px;">
+            <span>Test Image (Blue Square)</span>
+        </div>
+        
+        <div class="test-item draggable" draggable="true" data-type="image">
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjMTBiOTgxIi8+Cjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk9LPC90ZXh0Pgo8L3N2Zz4K" alt="Success Image" style="width: 100px; height: 100px; border-radius: 4px;">
+            <span>Success Image (Green Square)</span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔗 Link Content</h2>
+        <p>Try dragging these links:</p>
+        
+        <div class="test-item draggable" draggable="true" data-type="link">
+            <a href="https://github.com" target="_blank">GitHub</a>
+        </div>
+        
+        <div class="test-item draggable" draggable="true" data-type="link">
+            <a href="https://developer.mozilla.org" target="_blank">MDN Web Docs</a>
+        </div>
+        
+        <div class="test-item draggable" draggable="true" data-type="link">
+            <a href="https://stackoverflow.com" target="_blank">Stack Overflow</a>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📁 File Content</h2>
+        <p>Create a test file to drag:</p>
+        
+        <div class="test-item" id="file-test">
+            <strong>Test File:</strong> 
+            <button onclick="createTestFile()">Create Test File</button>
+            <span id="file-status"></span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ Expected Results</h2>
+        <ul>
+            <li>✅ Floating button appears in top-right corner</li>
+            <li>✅ Dragging text shows visual feedback</li>
+            <li>✅ Dragging images shows visual feedback</li>
+            <li>✅ Dragging links shows visual feedback</li>
+            <li>✅ Content appears in SoxDrawer storage</li>
+            <li>✅ Popup shows uploaded items</li>
+            <li>✅ Notifications appear for successful uploads</li>
+        </ul>
+    </div>
+
+    <script>
+        // Make draggable items work
+        document.querySelectorAll('.draggable').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.textContent || item.innerText);
+                item.classList.add('highlight');
+            });
+            
+            item.addEventListener('dragend', (e) => {
+                item.classList.remove('highlight');
+            });
+        });
+
+        // Create test file function
+        function createTestFile() {
+            const content = 'This is a test file created for SoxDrawer extension testing.\n\nTimestamp: ' + new Date().toISOString();
+            const blob = new Blob([content], { type: 'text/plain' });
+            const file = new File([blob], 'test-file.txt', { type: 'text/plain' });
+            
+            // Create a draggable element for the file
+            const fileElement = document.createElement('div');
+            fileElement.className = 'test-item draggable';
+            fileElement.draggable = true;
+            fileElement.innerHTML = `
+                <strong>Test File:</strong> test-file.txt (${file.size} bytes)
+                <br><small>Click and drag this item to test file upload</small>
+            `;
+            
+            fileElement.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', content);
+                e.dataTransfer.files = [file];
+                fileElement.classList.add('highlight');
+            });
+            
+            fileElement.addEventListener('dragend', (e) => {
+                fileElement.classList.remove('highlight');
+            });
+            
+            document.getElementById('file-test').replaceWith(fileElement);
+            document.getElementById('file-status').textContent = 'File created! Drag it to test.';
+        }
+
+        // Add some visual feedback for drag operations
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            document.body.style.border = '3px dashed #3b82f6';
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            document.body.style.border = '';
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.body.style.border = '';
+        });
+    </script>
+</body>
+</html> 

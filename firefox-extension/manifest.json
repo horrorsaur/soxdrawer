@@ -1,21 +1,45 @@
 {
-  "manifest_version": 3,
-
-  "name": "soxdrawer",
-  "version": "0.1",
-  "description": "A NATS-powered object storage service extension",
-
-  "permissions": ["storage", "notifications"],
-
-  "host_permissions": ["*://localhost:8080/*", "*://127.0.0.1:8080/*"],
-
-  "background": {
-    "scripts": ["client.js", "background.js"]
+  "manifest_version": 2,
+  "name": "SoxDrawer",
+  "version": "1.0.0",
+  "description": "A drag & drop object store for Firefox",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "browser_action": {
+    "default_title": "SoxDrawer",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
-
-  "sidebar_action": {
-    "default_title": "soxdrawer - local object storage",
-    "default_panel": "sidebar/sidebar.html",
-    "open_at_install": false
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    "popup.html",
+    "popup.js",
+    "popup.css",
+    "icons/*"
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   }
-}
+} 
