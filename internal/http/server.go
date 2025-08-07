@@ -97,7 +97,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/download/", s.downloadHandler)
 
 	// Apply middleware
-	handler := corsMiddleware(authMiddleware(s.authToken)(mux))
+	handler := authMiddleware(s.authToken)(mux)
 
 	s.server = &http.Server{
 		Addr:    s.Address,
